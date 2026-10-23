@@ -1,0 +1,28 @@
+# Android / Gradle
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+*.p12
+
+# Room schema exports are generated; commit them only when the schema is final.
+schemas/
+
+# Secrets — never commit
+.env
+.env.*
+secrets.properties
+api-keys.properties
+
+# Logs / tooling
+*.log
+.kotlin/

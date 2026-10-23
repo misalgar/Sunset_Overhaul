@@ -1,0 +1,257 @@
+# Implementation plan — foundation milestone
+
+Source of truth: [Sunset_Overhaul_Requirements_and_Design_Spec.md](Sunset_Overhaul_Requirements_and_Design_Spec.md).
+This document records what was built, how it is verified and what remains.
+
+## 1. Goal
+
+Deliver a runnable, fully offline foundation for the Sunset v2 client:
+
+- adaptive Compose app shell for phone, tablet, Android TV and Fire TV;
+- placeholder-quality but complete screens for the milestone journeys;
+- one provider boundary with a fake implementation and a fail-closed production adapter;
+- English/Spanish string catalogue and design tokens from the spec appendix;
+- no production calls, credentials, ads or analytics.
+
+## 2. Decisions taken
+
+| Decision | Rationale |
+| --- | --- |
+| Package `com.markooverhaul.sunset.v2` | Instructed for this overhaul; spec appendix says `com.nathnetwork.sunset.v2`. Confirm before release. |
+| 22 Gradle modules | Matches spec §12.2 and keeps provider, player and feature code isolated. |
+| Version catalog + Gradle KTS | Single reviewable dependency source. |
+| Strings centralised in `:core:ui` | One translation file pair shared by all features; avoids per-feature drift. |
+| `ContentProvider` in `:core:model` | Domain contract has no networking or DTO types. |
+| Fake provider in `:core:data` | Demo data and repositories share the same module. |
+| Provider binding in `:app` source sets | Debug binds the fake; release binds the blocked adapter. No mock code is reachable in release. |
+| Manual breakpoints + `LocalIsTelevision` | Avoids a window-size-class dependency for the milestone; TV detection uses `UiModeManager`. |
+| Deterministic gradient/monogram artwork | Fixture artwork URLs are `null`, so the demo is 100% offline. |
+| Bundled sample MP4 | Player is demonstrable without a public stream or network. |
+| R8 disabled | Keeps the scaffold reviewable; must be enabled before production. |
+| Settings session in DataStore | Synthetic demo session only. Real tokens must move to Keystore-backed storage before integration. |
+
+## 3. Version matrix
+
+| Component | Version |
+| --- | --- |
+| Android Gradle Plugin | 9.1.1 |
+| Gradle wrapper | 9.3.1 |
+| Kotlin | 2.4.10 (AGP built-in Kotlin) |
+| KSP | 2.3.12 |
+| Hilt | 2.60.1 |
+| Compose BOM | 2026.09.00 |
+| Compose for TV | 1.1.0 |
+| Navigation Compose | 2.9.8 |
+| Lifecycle | 2.11.0 |
+| Activity Compose | 1.13.0 |
+| Room | 2.8.5 |
+| DataStore | 1.2.1 |
+| Paging | 3.5.3 |
+| Media3 | 1.11.1 |
+| Coil | 3.6.3 |
+| Retrofit / OkHttp | 3.0.0 / 4.12.0 |
+| compileSdk / targetSdk / minSdk | 37 / 37 / 23 |
+
+`compileSdk 37` maps to the installed `platforms;android-37.0` package and requires AGP 9.1+.
+Kotlin is applied by AGP 9's built-in Kotlin support; do not add `org.jetbrains.kotlin.android` or
+`kotlinOptions`. Navigation is pinned to 2.9.8 and DataStore to 1.2.1 because their next releases
+require `minSdk 24`, while this milestone must keep `minSdk 23`. The wrapper is committed so the
+build is reproducible; only the JDK and SDK are host prerequisites.
+
+## 4. Module build order
+
+```text
+core:common -> core:model -> core:designsystem -> core:ui
+core:database -> core:data
+core:network (blocked adapter, no runtime use)
+core:player
+feature:* -> app
+```
+
+`:core:ui` owns the shared string catalogue and shared composables. Feature modules depend on
+design tokens and UI components, never on each other.
+
+## 5. What is implemented
+
+### 5.1 App shell and startup
+
+- `SunsetApplication` with `@HiltAndroidApp`.
+- `MainActivity : AppCompatActivity` (required for per-app locales) with TV detection.
+- `AppViewModel` startup states: `Loading`, `Ready`, `NeedsLogin`, `ServiceNotConfigured`.
+- Debug auto-starts a synthetic session; release fails closed before login.
+- `SunsetTheme` applies TV typography and the persisted reduce-motion preference.
+- Adaptive shell: phone bottom navigation; tablet/TV wordmark + top navigation.
+- Navigation Compose graph with details and search deep links.
+- `More` destination for Guide, Search, My List and Settings on phones.
+
+### 5.2 Screens
+
+| Screen | Notes |
+| --- | --- |
+| Splash | Wordmark, tagline, demo/checking copy |
+| Home | Hero, Continue Watching, Live Now, recent/recommended rows, My List |
+| Live TV | Category filters, favourites, now/next, guide entry |
+| Guide | Day selection, channel column, programme cards, favourites |
+| Movies / Series | Paging 3 grids with category filters and empty/error states |
+| Search | Debounced query, recent searches, grouped results, favourite toggle |
+| My List | Resolves local favourites into movies, series and channels |
+| Details | Movie and series detail, seasons, episodes, similar titles |
+| Player | Media3 surface, resume, 5 s progress saves, autoplay next, D-pad controls, live mode |
+| Account | Demo login (debug), blocked-service copy in release |
+| Settings | Account, playback toggles, language, reduce motion, parental/about/profile links |
+| About | Version/build/provider status, TMDB attribution, privacy, licences |
+| Parental | Honest placeholder; no lock state is claimed |
+| Profiles | Honest placeholder for the v1.2 picker |
+
+### 5.3 Data and playback
+
+- `FakeCatalog`: fictional movies, series, episodes, channels and EPG; local-midnight guide data.
+- `FakeContentProvider`: deterministic paging, search and `demo://local-sample` resolution.
+- `SessionStore` / `AuthRepository`: DataStore-backed synthetic session.
+- `SettingsRepository`, `FavouritesRepository`, `ProgressRepository`, `SearchHistoryRepository`.
+- Room database for favourites and watch progress.
+- `Media3PlaybackEngine`: maps demo references to `raw/sample_placeholder.mp4`; classifies errors.
+- Per-player engine instance, released in `ViewModel.onCleared()`; final position persisted.
+
+### 5.4 Design system and strings
+
+- Appendix C colour, radius, spacing, motion and type tokens.
+- Bundled Inter static fonts (offline, API 23+).
+- Focus ring (flush on cards, 2 dp gap halo on buttons), card focus lift, pill buttons, chips,
+  section cards, empty/error states, skeletons.
+- Device-aware type scale (TV = 1.15× phone, body never below 18 sp).
+- 285 English strings mirrored 1:1 in Spanish under `:core:ui`.
+
+## 6. Verification
+
+### 6.1 Automated checks
+
+```bash
+./gradlew :app:assembleDebug
+./gradlew :app:assembleRelease
+./gradlew :app:lintDebug
+./gradlew test
+```
+
+Minimum automated gate for this milestone: both variants assemble, lint has no fatal errors, and the
+JVM tests pass. The manual demo flows below are a separate device gate.
+
+### 6.2 Manual demo checklist
+
+- [ ] Debug launch reaches Home without network or credentials.
+- [ ] Home hero → Details → Play starts the bundled sample.
+- [ ] Continue Watching appears after leaving the player mid-clip.
+- [ ] Live → channel → player shows LIVE mode and no seek bar.
+- [ ] Live → Guide → day/channel selection works.
+- [ ] Search → result → Details → Play works offline.
+- [ ] My List add/remove survives process restart.
+- [ ] Settings changes persist; language switches EN/ES; sign-out returns to login.
+- [ ] Release build shows "Service not configured" and offers no sign-in.
+- [ ] D-pad focus is visible on TV; back never traps the user.
+- [ ] Player shows the placeholder marker at all times.
+
+### 6.3 TV feedback from the first device run (2026-10-23)
+
+The debug APK was installed on an Android TV and the overall app was accepted. Three TV issues were
+reported and fixed in the same milestone:
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| "Too big, can't see the titles or info below the boxes." | TV posters were a fixed 196 dp (only four fit a 960-1080 dp viewport) and the hero was 500 dp tall. The focus target covered only the artwork, so bring-into-view could leave the caption below the viewport. | Home now derives six poster columns from the actual viewport width (120-176 dp posters). The TV hero is 48% of the viewport height (280-340 dp) with compact type and no extra 80 dp. The whole card (artwork + title + metadata) is one focus target, so the caption scrolls into view with the poster. |
+| "Going down in Search returns to the search box and the keyboard opens again; Next opens the keyboard again." | The IME action did not submit or dismiss the keyboard, focus stayed in the text field, and Down wrapped back to the field. | Search now submits on Search/Next/Done/Go, hides the IME and moves focus to the first result. With the keyboard dismissed, Down moves into the results; returning to Search restores focus to the results instead of reopening the keyboard. |
+| "The Play/Resume button does not change colour when selected." | Material 3 buttons had no focus or hover colours. | Primary and secondary buttons now brighten on focus/hover (`accent/hover`, `bg/surface-3`) and icon buttons switch to `accent/primary`; all buttons draw the TV focus ring. |
+
+A second device pass on the same TV (Fire TV AFTMM, 1920x1080 UI) reported two follow-ups, fixed and
+verified on the device:
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| "The hover of some buttons looks pixelated." | The 1.04 focus lift was applied to buttons, so the whole button layer (text, icon, ring) was rasterised once and then scaled up. | Focus lift removed from buttons; focus is now fill colour plus a 2 dp amber ring drawn outside the button with a 2 dp background gap and a 1 dp dark outer stroke (`sunsetFocusRing(gap = 2.dp)`). Cards keep the flush ring and the 1.04 lift on the artwork only. |
+| "Going up and down over the search box opens the keyboard every time." | The TV search field was a focusable text field, so gaining focus showed the IME. | The TV search box is now a plain focus stop (`canFocus = editing`); only Select/Enter on it enters edit mode and shows the IME. D-pad traversal passes over it without the keyboard, Down moves into the results, and submitting from the IME (Search/Next/Done/Go) hides the keyboard and focuses the first result. |
+| Result group header was half clipped once the first result took focus. | The redundant "Search" title pushed the results viewport below the height of one poster group, so bringing the focused card into view scrolled its section header off the top. | The "Search" title is hidden on TV (the nav pill and field placeholder already say it), which gives the results the full height and keeps the group header, poster and caption on screen together. |
+
+Re-test on the same TV is pending; see `docs/RUNNING_ON_DEVICE.md` for the install command.
+
+### 6.4 Toolchain status
+
+Verified on 2026-10-23 on Windows with a portable toolchain:
+
+| Component | Value |
+| --- | --- |
+| JDK | 17.0.20.1+1 (Temurin) |
+| Android SDK | `platform-tools`, `platforms;android-37.0`, `build-tools;36.0.0` |
+| Gradle | 9.3.1 (wrapper) |
+
+Command results:
+
+| Command | Result |
+| --- | --- |
+| `:app:assembleDebug` | **BUILD SUCCESSFUL**; `app/build/outputs/apk/debug/app-debug.apk` |
+| `:app:assembleRelease` | **BUILD SUCCESSFUL**; `app/build/outputs/apk/release/app-release-unsigned.apk` |
+| `:app:lintDebug` | **BUILD SUCCESSFUL**; 0 errors, 18 warnings (version notices and manifest attributes) |
+| `test` | **BUILD SUCCESSFUL**; 10 JVM tests in `:core:data`, 0 failures; other modules have no test sources |
+
+The release APK is unsigned by design; add a signing config outside the repository before installing
+it on a device.
+
+Lint note: AGP 9.1.1's `PropertyEscape` check reports a false positive for an absolute Windows
+`sdk.dir` in `local.properties`, even when correctly escaped. `app/lint.xml` ignores that issue for
+the machine-local, gitignored file only; all other lint checks remain enabled. The verified run used
+`ANDROID_HOME`; a re-run with `local.properties` present also passed.
+
+Host setup:
+
+1. Install JDK 17 and set `JAVA_HOME`.
+2. Install command-line tools, then:
+   ```bash
+   sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-37.0" "build-tools;36.0.0"
+   sdkmanager --licenses
+   ```
+3. Set `ANDROID_HOME`, or create `local.properties` with `sdk.dir=...` (never commit it).
+4. Run the Gradle commands above.
+
+A physical Android TV run has been completed for the Home and Search flows (§6.3). The remaining
+§6.2 items still need a full device pass; this environment has no emulator image, TV emulator or
+authorised device attached.
+
+## 7. Sample media provenance
+
+`core/player/src/main/res/raw/sample_placeholder.mp4` was generated locally for this repository:
+
+```bash
+ffmpeg -f lavfi -i color=c=0x08090C:s=640x360:d=12:r=30 \
+  -vf "drawtext=fontfile=...:text='SUNSET DEMO — bundled sample — not provider content':fontcolor=0xF5A524:fontsize=18:x=(w-text_w)/2:y=(h-text_h)/2" \
+  -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest sample_placeholder.mp4
+```
+
+The baked-in text is media content, not UI copy. Replacing it with real provider content is out of
+scope until provider access is approved.
+
+## 8. Known limitations
+
+- Real provider integration is blocked (see `PROVIDER_INTEGRATION.md`). Every EZServer call fails
+  closed.
+- Parental controls and profiles are placeholders.
+- Autoplay-next works for series episodes; cross-content autoplay is not implemented.
+- Track selection, PiP and aspect-ratio switching are settings placeholders.
+- No cast, downloads, DVR, multi-screen, reminders, radio or speed test (out of scope).
+- R8 is disabled; release shrinking and mapping upload are pending.
+- No screenshot or UI tests yet. Ten JVM tests cover fake-provider login, paging, filtering, search,
+  stream resolution and guide generation. Paging 3 UI, Media3 raw-resource playback, deep links and
+  source-set Hilt binding still need device or instrumentation verification.
+- The debug session is stored in DataStore. Production tokens must use Keystore-backed encryption.
+
+## 9. Next three tasks
+
+1. **Device and TV validation.** Re-install the updated debug APK on the Android TV and confirm the
+   three fixes in §6.3 (card captions, Search focus/IME, button focus colours). Then walk §6.2 end to
+   end on a phone and TV: offline startup, Paging 3 grids, Media3 sample playback, deep links, D-pad
+   focus/back, EN/ES switching and release fail-closed copy.
+2. **Provider integration spike (approval required).** Obtain test-line access and redacted API
+   documentation, implement `EzServerContentProvider` behind the contract, and add contract tests.
+   No production call before written approval.
+3. **Release hardening.** Add a signing config outside the repo, enable and test R8 with keep rules
+   for serialization/Media3, and add baseline profiles plus screenshot tests for the core journeys.
+
+Later milestones: parental PIN and category locks; profile picker and per-profile history; PiP and
+track selection; R8 and baseline profiles; screenshot tests.

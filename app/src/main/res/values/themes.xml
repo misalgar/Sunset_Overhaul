@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      AppCompat theme so AppCompatDelegate.setApplicationLocales can recreate the activity when
+      the user switches between English and Spanish. Colours mirror the Compose tokens.
+    -->
+    <style name="Theme.Sunset" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/sunset_bg_base</item>
+        <item name="android:colorBackground">@color/sunset_bg_base</item>
+        <item name="android:statusBarColor">@color/sunset_bg_base</item>
+        <item name="android:navigationBarColor">@color/sunset_bg_base</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

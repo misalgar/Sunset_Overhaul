@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+      AGP 9.1.1 reports PropertyEscape for a correctly escaped absolute Windows sdk.dir in
+      local.properties. The file is machine-local and gitignored, so ignore the false positive.
+    -->
+    <issue id="PropertyEscape">
+        <ignore path="local.properties" />
+    </issue>
+</lint>
