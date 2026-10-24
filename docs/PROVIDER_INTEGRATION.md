@@ -81,9 +81,10 @@ debuggable, so `run-as`, `/proc` and `logcat` do not expose the URL.
 | Runtime session token (credentials, encrypted) | Android Keystore via `EncryptedSessionStore` |
 | Legacy app on the Fire TV | left signed in; used only for discovery |
 
-The host appears once in tracked code, in `app/src/main/res/xml/network_security_config.xml`, because
-the release build needs a cleartext exception for it. Move it to an untracked build value if the
-repository is ever published.
+No provider hostname is tracked. The release network security config is generated at build time
+(`GenerateNetworkSecurityConfig`) from `sunset.provider.host` in the gitignored `local.properties`;
+without that key the release config permits no cleartext host at all. Debug keeps its own override
+in `app/src/debug/res/xml/network_security_config.xml`.
 
 ## 1. What is known (legacy EZServer paths)
 

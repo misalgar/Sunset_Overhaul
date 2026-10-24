@@ -52,8 +52,9 @@ The debug build keeps the offline demo and adds a real Xtream Codes provider beh
    Keystore.
 3. **Explore the demo** keeps the offline catalogue available with no server or account.
 
-Cleartext HTTP is permitted in debug because the panel redirects streams to a raw-IP host; release
-keeps the scoped policy in `app/src/main/res/xml/network_security_config.xml`.
+Cleartext HTTP is permitted in debug because the panel redirects streams to a raw-IP host. The
+release policy is generated at build time from `sunset.provider.host` in the gitignored
+`local.properties`, so no provider hostname is stored in the repository.
 
 ## Demo flow (offline)
 

@@ -1,8 +1,74 @@
+import java.util.Properties
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+}
+
+// The provider host is machine-local: it comes from local.properties (gitignored) so the repository
+// stays provider-neutral. Without it the release config simply permits no cleartext host.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) file.inputStream().use { load(it) }
+}
+val providerHostValue = localProperties.getProperty("sunset.provider.host")?.trim().orEmpty()
+
+abstract class GenerateNetworkSecurityConfig : DefaultTask() {
+    @get:Input
+    abstract val providerHost: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val host = providerHost.get().trim()
+        val domainBlock = if (host.isEmpty()) {
+            ""
+        } else {
+            """
+            |    <domain-config cleartextTrafficPermitted="true">
+            |        <domain includeSubdomains="true">$host</domain>
+            |    </domain-config>
+            """.trimMargin()
+        }
+        val xmlDir = outputDir.get().asFile.resolve("xml").apply { mkdirs() }
+        xmlDir.resolve("network_security_config.xml").writeText(
+            """
+            |<?xml version="1.0" encoding="utf-8"?>
+            |<!-- Generated at build time from local.properties; do not edit. -->
+            |<network-security-config>
+            |    <base-config cleartextTrafficPermitted="false" />
+            |$domainBlock
+            |</network-security-config>
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
+val generateNetworkSecurityConfig = tasks.register<GenerateNetworkSecurityConfig>(
+    "generateNetworkSecurityConfig",
+) {
+    providerHost.set(providerHostValue)
+    outputDir.set(layout.buildDirectory.dir("generated/res/networkSecurityConfig"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.res?.addGeneratedSourceDirectory(
+            generateNetworkSecurityConfig,
+            GenerateNetworkSecurityConfig::outputDir,
+        )
+    }
 }
 
 android {
@@ -106,3 +172,4 @@ dependencies {
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.espresso)
 }
+
