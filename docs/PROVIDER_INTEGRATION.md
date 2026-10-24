@@ -100,8 +100,11 @@ is keyed by account, survives restarts and is dropped only when a different acco
 years are split out of names like `Name (1999) SUB`, and playback uses the panel's
 `container_extension` instead of assuming MP4.
 
-**Known limits.** Some VOD files are HEVC/MKV and fail on older devices with "stream not
-supported" — a device codec limit, not a provider error. EPG and catch-up are still pending.
+**Known limits.** A cold start still spends ~30 s decoding the 52k-title JSON from disk before the
+movie rows and hero appear; Home shows live content immediately and the catalogues fill in after.
+Moving the catalogue to Room with indexed paging is the next optimisation. Some VOD files are
+HEVC/MKV and fail on older devices with "stream not supported" — a device codec limit, not a
+provider error. EPG and catch-up are still pending.
 
 Verified on the Fire TV (2026-10-24): live login and playback; movie grid with posters and captions;
 movie detail with backdrop, runtime, genre, plot and cast from `get_vod_info`; movie playback;
