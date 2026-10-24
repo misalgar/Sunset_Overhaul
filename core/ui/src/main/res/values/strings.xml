@@ -131,6 +131,11 @@
 
     <!-- Guide -->
     <string name="guide_title">TV Guide</string>
+    <string name="guide_date_time">%1$s · %2$s</string>
+    <string name="guide_day_date">%1$s · %2$s</string>
+    <string name="guide_select_programme">Select a programme to see its details.</string>
+    <string name="guide_watch_channel">Watch channel</string>
+    <string name="guide_no_data_short">No guide data</string>
     <string name="guide_today">Today</string>
     <string name="guide_tomorrow">Tomorrow</string>
     <string name="guide_all_channels">All channels</string>

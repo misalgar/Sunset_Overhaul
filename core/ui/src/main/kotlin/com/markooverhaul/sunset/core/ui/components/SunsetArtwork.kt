@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -77,11 +78,12 @@ fun ChannelLogo(
     name: String,
     logoUrl: String?,
     modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
 ) {
     Box(
         modifier = modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .size(size)
+            .clip(RoundedCornerShape(size / 6f))
             .background(SunsetColors.BgSurface3),
         contentAlignment = Alignment.Center,
     ) {
@@ -90,7 +92,7 @@ fun ChannelLogo(
                 model = logoUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(size * 0.84f),
             )
         } else {
             Text(

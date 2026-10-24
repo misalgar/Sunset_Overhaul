@@ -121,6 +121,11 @@
     <string name="live_channel_count">%1$d canales</string>
 
     <string name="guide_title">Guía de TV</string>
+    <string name="guide_date_time">%1$s · %2$s</string>
+    <string name="guide_day_date">%1$s · %2$s</string>
+    <string name="guide_select_programme">Selecciona un programa para ver los detalles.</string>
+    <string name="guide_watch_channel">Ver canal</string>
+    <string name="guide_no_data_short">Sin datos de guía</string>
     <string name="guide_today">Hoy</string>
     <string name="guide_tomorrow">Mañana</string>
     <string name="guide_all_channels">Todos los canales</string>

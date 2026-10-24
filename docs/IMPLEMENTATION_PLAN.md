@@ -179,6 +179,28 @@ series grid, series detail with 12 episodes and cast, episode playback, three-wa
 Verified on the Fire TV: On Now cards show programme title and time, the Guide lists a channel's
 timeline with a red "Now" marker, and Home's Live Now rail shows now/next.
 
+### 5.8 Broadcast-style TV guide (2026-10-24)
+
+Replaced the stacked programme cards with a time grid closer to a set-top-box guide:
+
+- Programme preview above the grid: channel, title, time range, remaining time, description,
+  channel/programme artwork and a Watch action. It follows the focused block.
+- Time ruler every 30 minutes with a red now-line; one row per channel; blocks sized by real
+  duration (clipped at midnight) and a progress bar on the current programme.
+- Ruler and every row share one `ScrollState`, so the ruler stays aligned with the grid while
+  D-pad focus scrolls horizontally.
+- Blocks are laid out sequentially (`Spacer` + block) instead of absolute `offset`. Absolute
+  offsets made the focus engine treat every block as starting at the row origin, so left/right
+  skipped the timeline. Sequential layout gives correct geometric focus traversal.
+- The header date follows the selected day ("Tomorrow · Oct 25, 2026").
+- Channel cells are focusable and play the channel on Select, so channels with no EPG data are
+  still watchable; they show a short "No guide data" label.
+- Grid text stays one line per block and only shows the time range when the block is wide enough.
+
+Verified on the Fire TV: grid alignment, ruler sync, now marker, D-pad left/right through the
+timeline, up/down across channels, preview updates, programme/channel playback, Tomorrow view and
+the no-guide state.
+
 Next: catalogue cold-start (Room), release binding, phone/tablet pass.
 
 ## 6. Verification
