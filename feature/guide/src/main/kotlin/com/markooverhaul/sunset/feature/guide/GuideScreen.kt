@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +54,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -72,6 +75,7 @@ import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.artworkGradient
 import com.markooverhaul.sunset.core.ui.util.SunsetFormat
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
+import java.util.Locale
 import kotlinx.coroutines.delay
 
 private const val DAY_MS = 86_400_000L
@@ -99,6 +103,9 @@ fun GuideRoute(
         onBack = onBack,
         onSelectDay = viewModel::selectDay,
         onToggleFavouritesOnly = viewModel::toggleFavouritesOnly,
+        onSelectCountry = viewModel::selectCountry,
+        onOpenCountryPicker = viewModel::openCountryPicker,
+        onDismissCountryPicker = viewModel::dismissCountryPicker,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -116,6 +123,9 @@ fun GuideScreen(
     onBack: () -> Unit,
     onSelectDay: (Int) -> Unit,
     onToggleFavouritesOnly: () -> Unit,
+    onSelectCountry: (String?) -> Unit,
+    onOpenCountryPicker: () -> Unit,
+    onDismissCountryPicker: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -135,6 +145,7 @@ fun GuideScreen(
     val todayFocus = remember { FocusRequester() }
     val tomorrowFocus = remember { FocusRequester() }
     val favouritesFocus = remember { FocusRequester() }
+    val countryFocus = remember { FocusRequester() }
     val gridFocus = remember { FocusRequester() }
     val watchFocus = remember { FocusRequester() }
     val activeTabFocus = when {
@@ -206,11 +217,14 @@ fun GuideScreen(
         GuideFilterRow(
             state = state,
             gutter = gutter,
+            isTv = isTv,
             onSelectDay = onSelectDay,
             onToggleFavouritesOnly = onToggleFavouritesOnly,
+            onOpenCountryPicker = onOpenCountryPicker,
             todayFocus = todayFocus,
             tomorrowFocus = tomorrowFocus,
             favouritesFocus = favouritesFocus,
+            countryFocus = countryFocus,
             watchFocus = watchFocus,
             gridFocus = gridFocus,
         )
@@ -277,6 +291,15 @@ fun GuideScreen(
                 }
             }
         }
+    }
+
+    if (state.countryPickerOpen) {
+        GuideCountryDialog(
+            channels = state.channels,
+            selectedCountry = state.selectedCountry,
+            onSelect = onSelectCountry,
+            onDismiss = onDismissCountryPicker,
+        )
     }
 }
 
@@ -518,11 +541,14 @@ private fun GuidePreviewArtwork(
 private fun GuideFilterRow(
     state: GuideUiState,
     gutter: Dp,
+    isTv: Boolean,
     onSelectDay: (Int) -> Unit,
     onToggleFavouritesOnly: () -> Unit,
+    onOpenCountryPicker: () -> Unit,
     todayFocus: FocusRequester,
     tomorrowFocus: FocusRequester,
     favouritesFocus: FocusRequester,
+    countryFocus: FocusRequester,
     watchFocus: FocusRequester,
     gridFocus: FocusRequester,
 ) {
@@ -530,7 +556,9 @@ private fun GuideFilterRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = gutter, vertical = SunsetSpacing.Xs),
-        horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Xl),
+        horizontalArrangement = Arrangement.spacedBy(
+            if (isTv) SunsetSpacing.Xl else SunsetSpacing.Md,
+        ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         GuideTab(
@@ -557,7 +585,23 @@ private fun GuideFilterRow(
             upFocus = watchFocus,
             downFocus = gridFocus,
         )
+        Spacer(modifier = Modifier.weight(1f))
+        GuideTab(
+            text = countryFilterLabel(state.selectedCountry),
+            selected = state.selectedCountry != null,
+            onClick = onOpenCountryPicker,
+            focusRequester = countryFocus,
+            upFocus = watchFocus,
+            downFocus = gridFocus,
+        )
     }
+}
+
+@Composable
+private fun countryFilterLabel(code: String?): String = when (code) {
+    null -> stringResource(R.string.guide_country_all)
+    GuideViewModel.OTHER_COUNTRY -> stringResource(R.string.guide_country_other)
+    else -> Locale("", code).getDisplayCountry(Locale.getDefault()).ifBlank { code }
 }
 
 /** Text-style filter tab: no pill, amber text and a 2 dp underline when selected or focused. */
@@ -684,6 +728,215 @@ private fun GuideAction(
         }
     }
 }
+
+@Composable
+private fun GuideCountryDialog(
+    channels: List<LiveChannel>,
+    selectedCountry: String?,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val counts = remember(channels) { channels.groupingBy { it.countryCode }.eachCount() }
+    val countries = remember(counts) {
+        counts.entries
+            .filter { it.key != null }
+            .sortedWith(
+                compareByDescending<Map.Entry<String?, Int>> { it.value }
+                    .thenBy { it.key.orEmpty() },
+            )
+            .mapNotNull { it.key }
+    }
+    val otherCount = counts[null] ?: 0
+    val initialFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(150)
+        runCatching { initialFocus.requestFocus() }
+    }
+    val selectedKey = selectedCountry ?: "all"
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SunsetColors.ScrimSolid.copy(alpha = 0.78f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.86f)
+                    .widthIn(max = 560.dp)
+                    .fillMaxHeight(0.8f)
+                    .background(
+                        SunsetColors.BgSurface2,
+                        RoundedCornerShape(SunsetRadius.Lg),
+                    )
+                    .padding(SunsetSpacing.Lg),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.guide_country_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = SunsetColors.TextPrimary,
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    GuideLink(
+                        text = stringResource(R.string.guide_country_close),
+                        onClick = onDismiss,
+                    )
+                }
+                Spacer(modifier = Modifier.height(SunsetSpacing.Sm))
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    item(key = "all") {
+                        CountryRow(
+                            label = stringResource(R.string.guide_country_all),
+                            count = channels.size,
+                            selected = selectedCountry == null,
+                            focusRequester = if (selectedKey == "all") initialFocus else null,
+                            onClick = { onSelect(null) },
+                        )
+                    }
+                    items(countries, key = { it }) { code ->
+                        CountryRow(
+                            label = displayCountry(code),
+                            count = counts[code] ?: 0,
+                            selected = selectedCountry == code,
+                            focusRequester = if (selectedKey == code) initialFocus else null,
+                            onClick = { onSelect(code) },
+                        )
+                    }
+                    item(key = "other") {
+                        CountryRow(
+                            label = stringResource(R.string.guide_country_other),
+                            count = otherCount,
+                            selected = selectedCountry == GuideViewModel.OTHER_COUNTRY,
+                            focusRequester = if (selectedKey == GuideViewModel.OTHER_COUNTRY) {
+                                initialFocus
+                            } else {
+                                null
+                            },
+                            onClick = { onSelect(GuideViewModel.OTHER_COUNTRY) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CountryRow(
+    label: String,
+    count: Int,
+    selected: Boolean,
+    focusRequester: FocusRequester?,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val requesterModifier = if (focusRequester != null) {
+        Modifier.focusRequester(focusRequester)
+    } else {
+        Modifier
+    }
+    SunsetFocusable(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .then(requesterModifier),
+        shape = RectangleShape,
+        scaleOnFocus = false,
+        drawFocusRing = false,
+        onFocusChanged = { focused = it },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    when {
+                        focused -> SunsetColors.AccentPrimary.copy(alpha = 0.14f)
+                        selected -> SunsetColors.AccentPrimary.copy(alpha = 0.06f)
+                        else -> Color.Transparent
+                    },
+                )
+                .drawBehind {
+                    drawLine(
+                        color = SunsetColors.BorderSubtle.copy(alpha = 0.45f),
+                        start = Offset(0f, size.height),
+                        end = Offset(size.width, size.height),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                }
+                .padding(horizontal = SunsetSpacing.Md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = when {
+                    focused || selected -> SunsetColors.AccentPrimary
+                    else -> SunsetColors.TextPrimary
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) SunsetColors.AccentPrimary else SunsetColors.TextTertiary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuideLink(
+    text: String,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    SunsetFocusable(
+        onClick = onClick,
+        modifier = Modifier.height(40.dp),
+        shape = RectangleShape,
+        scaleOnFocus = false,
+        drawFocusRing = false,
+        onFocusChanged = { focused = it },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(horizontal = SunsetSpacing.Sm),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (focused) SunsetColors.AccentHover else SunsetColors.AccentPrimary,
+                modifier = Modifier.drawBehind {
+                    if (focused) {
+                        val y = size.height + 3.dp.toPx()
+                        drawLine(
+                            color = SunsetColors.AccentPrimary,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 2.dp.toPx(),
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun displayCountry(code: String): String =
+    Locale("", code).getDisplayCountry(Locale.getDefault()).ifBlank { code }
 
 @Composable
 private fun GuideRuler(

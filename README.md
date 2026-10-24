@@ -23,6 +23,10 @@ stream URL is stored in the repository; release builds still bind the fail-close
 | Live Xtream Codes login, account, live categories/channels, live playback (debug) | Complete |
 | VOD and series catalogues, details, episodes and three-way search from the live panel (debug) | Complete |
 | EPG from the live panel (`xmltv.php`) | Complete |
+| Broadcast-style flat TV guide with time grid and preview | Complete |
+| Room-backed VOD/series catalogue with indexed paging | Complete |
+| Country-aware channel names and guide country filter | Complete |
+| Optional TMDB enrichment (details, artwork, episode stills) | Complete; requires a key in `local.properties` |
 
 Builds, lint and JVM tests were verified on 2026-10-23; see [Verification](#verification) and
 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for exact commands and results. Manual

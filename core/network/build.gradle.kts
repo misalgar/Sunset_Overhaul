@@ -23,6 +23,7 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
+    implementation(project(":core:database"))
 
     implementation(libs.retrofit)
     implementation(libs.retrofit.serialization)
@@ -32,4 +33,6 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    testImplementation(libs.junit)
 }

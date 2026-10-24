@@ -126,6 +126,10 @@
     <string name="guide_select_programme">Selecciona un programa para ver los detalles.</string>
     <string name="guide_watch_channel">Ver canal</string>
     <string name="guide_no_data_short">Sin datos de guía</string>
+    <string name="guide_country_all">Todos los países</string>
+    <string name="guide_country_other">Otros</string>
+    <string name="guide_country_title">Filtrar por país</string>
+    <string name="guide_country_close">Cerrar</string>
     <string name="guide_today">Hoy</string>
     <string name="guide_tomorrow">Mañana</string>
     <string name="guide_all_channels">Todos los canales</string>

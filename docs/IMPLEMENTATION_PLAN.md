@@ -224,7 +224,34 @@ Replaced the card grid with a continuous schedule surface:
 Verified on the Fire TV: flat rows and dividers, solid amber cell focus, channel focus wash, tab
 focus loop, Tomorrow switch with the active tab retained, and channel playback.
 
-Next: catalogue cold-start (Room), release binding, phone/tablet pass.
+### 5.10 Room catalogue, country filtering and TMDB (2026-10-24)
+
+- The VOD/series catalogue now lives in Room (`catalogue_meta`, `catalogue_movies`,
+  `catalogue_series`, `catalogue_episodes`, DB version 2) and is paged with indexed `LIMIT/OFFSET`
+  queries. The raw JSON remains in the six-hour disk cache, so a failed insert does not refetch
+  16.6 MB.
+- First sync still parses the full payload; later launches query SQLite directly. Home was also
+  decoupled: live rows render first, the Room hero fills in independently, and the XMLTV now/next
+  map arrives last. Measured cold start to hero: ~6 s (previously ~30 s).
+- `CountryResolver` parses leading tokens (`USA |`, `CAN|`, `CH |`, `NC /`) with a curated alias
+  map and falls back to country-named categories (`Puerto Rico`, `España`, `TV Mexico`, …).
+  Unrecognised tokens (`NCAA`, `TNT`, `CINE`) are left untouched. Channel names are stored cleaned
+  and `LiveChannel.countryCode` is populated; 643 of 1,194 channels map to 23 countries.
+- The guide has a right-aligned country text tab (`All countries` / `United States` / `Other`) that
+  opens a D-pad dialog with per-country counts. The filter composes with day and favourites.
+- TMDB enrichment is optional and machine-local: `tmdb.read.token` / `tmdb.api.key` in the
+  gitignored `local.properties` become `BuildConfig` fields; blank values disable it. Provider
+  identity and playback fields always win; TMDB supplies overview/cast/genres/runtime/certification
+  and fills missing posters/backdrops. Matching strips quality suffixes and compares both localised
+  and original titles with a ±1-year window. Movie/series details enrich on open; episode stills
+  cover the first three seasons; a bounded backfill (60 movies + 40 series) runs after sync.
+  Matches are cached for 30 days. The existing About attribution is used.
+
+Verified on the Fire TV: cleaned channel names, country picker and US-only guide, instant Movies
+grid from Room, cold start to hero, and a TMDB-enriched movie detail with backdrop, runtime, genre
+and overview.
+
+Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification
 
@@ -352,29 +379,29 @@ scope until provider access is approved.
 ## 8. Known limitations
 
 - The live panel works in **debug** only; the release build still binds the fail-closed adapter.
-- VOD, series, episodes, EPG and catch-up are not implemented against the live panel yet; those
-  screens show empty rows until the next slice.
+- Catch-up/archive playback is not implemented against the live panel yet.
+- The first catalogue sync still parses the 16.6 MB VOD payload; later launches read Room.
+- Country aliases are panel-specific and intentionally conservative; unmapped channels fall under
+  “Other”.
+- TMDB enrichment requires a key in `local.properties`; without it the app runs with provider
+  metadata only. Matching is conservative, so obscure or renamed titles may stay unenriched.
 - Parental controls and profiles are placeholders.
 - Autoplay-next works for series episodes; cross-content autoplay is not implemented.
 - Track selection, PiP and aspect-ratio switching are settings placeholders.
 - No cast, downloads, DVR, multi-screen, reminders, radio or speed test (out of scope).
 - R8 is disabled; release shrinking and mapping upload are pending.
-- No screenshot or UI tests yet. Ten JVM tests cover fake-provider login, paging, filtering, search,
-  stream resolution and guide generation. Paging 3 UI, Media3 raw-resource playback, deep links and
-  source-set Hilt binding still need device or instrumentation verification.
-- The debug session is stored in DataStore. Production tokens must use Keystore-backed encryption.
+- No screenshot or UI tests yet. Fifteen JVM tests cover fake-provider login, paging, filtering,
+  search, stream resolution, guide generation and country parsing. Paging 3 UI, Media3 raw-resource
+  playback, deep links and source-set Hilt binding still need device or instrumentation verification.
 
 ## 9. Next three tasks
 
-1. **Device and TV validation.** Re-install the updated debug APK on the Android TV and confirm the
-   three fixes in §6.3 (card captions, Search focus/IME, button focus colours). Then walk §6.2 end to
-   end on a phone and TV: offline startup, Paging 3 grids, Media3 sample playback, deep links, D-pad
-   focus/back, EN/ES switching and release fail-closed copy.
-2. **Provider integration spike (approval required).** Obtain test-line access and redacted API
-   documentation, implement `EzServerContentProvider` behind the contract, and add contract tests.
-   No production call before written approval.
-3. **Release hardening.** Add a signing config outside the repo, enable and test R8 with keep rules
-   for serialization/Media3, and add baseline profiles plus screenshot tests for the core journeys.
+1. **Catch-up/archive playback.** Use the panel's `tv_archive` flags and programme timestamps to
+   offer “watch from start” in the guide and player.
+2. **Release hardening.** Add a signing config outside the repo, enable and test R8 with keep rules
+   for serialization/Media3, and resolve the cleartext stream-host policy.
+3. **Phone/tablet pass and quality gates.** Verify live and demo on a phone/tablet, fix the narrow
+   guide column, and add screenshot/UI tests for login → live → details → playback.
 
 Later milestones: parental PIN and category locks; profile picker and per-profile history; PiP and
 track selection; R8 and baseline profiles; screenshot tests.

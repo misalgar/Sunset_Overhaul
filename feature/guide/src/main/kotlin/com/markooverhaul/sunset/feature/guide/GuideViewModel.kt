@@ -27,10 +27,19 @@ data class GuideUiState(
     val favourites: Set<String> = emptySet(),
     val selectedDay: Int = 0,
     val favouritesOnly: Boolean = false,
+    val selectedCountry: String? = null,
+    val countryPickerOpen: Boolean = false,
     val error: Throwable? = null,
 ) {
     val visibleChannels: List<LiveChannel>
-        get() = if (favouritesOnly) channels.filter { it.id in favourites } else channels
+        get() {
+            val base = if (favouritesOnly) channels.filter { it.id in favourites } else channels
+            return when (selectedCountry) {
+                null -> base
+                GuideViewModel.OTHER_COUNTRY -> base.filter { it.countryCode == null }
+                else -> base.filter { it.countryCode == selectedCountry }
+            }
+        }
 }
 
 @HiltViewModel
@@ -60,6 +69,18 @@ class GuideViewModel @Inject constructor(
         _state.update { it.copy(favouritesOnly = !it.favouritesOnly) }
     }
 
+    fun selectCountry(countryCode: String?) {
+        _state.update { it.copy(selectedCountry = countryCode, countryPickerOpen = false) }
+    }
+
+    fun openCountryPicker() {
+        _state.update { it.copy(countryPickerOpen = true) }
+    }
+
+    fun dismissCountryPicker() {
+        _state.update { it.copy(countryPickerOpen = false) }
+    }
+
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -83,6 +104,9 @@ class GuideViewModel @Inject constructor(
     }
 
     companion object {
+        /** Sentinel for channels with no recognised country. */
+        const val OTHER_COUNTRY = "__other__"
+
         /** Local midnight for today, or tomorrow when [dayOffset] is 1. */
         fun startOfDay(dayOffset: Int): Long = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)

@@ -100,21 +100,36 @@ with a streaming pull parser; programme channel ids (`travelchannel.us`) are tra
 stream ids the UI uses. Channels without guide data say so rather than showing blank blocks.
 
 **Catalogue handling.** VOD and series lists are fetched once, cached on disk for six hours and
-paged in memory (60 per page): the panel has no pagination and the VOD payload is 16.6 MB. The cache
-is keyed by account, survives restarts and is dropped only when a different account signs in. Title
-years are split out of names like `Name (1999) SUB`, and playback uses the panel's
-`container_extension` instead of assuming MP4.
+stored in Room (`catalogue_movies`, `catalogue_series`, `catalogue_episodes`). Paging uses indexed
+`LIMIT/OFFSET` queries (60 per page): the panel has no pagination and the VOD payload is 16.6 MB.
+The cache is keyed by account, survives restarts and is dropped only when a different account signs
+in. Title years and trailing quality tags (`SUB`, `DUB`, `4K`, …) are split out of names like
+`Name (1999) SUB`, and playback uses the panel's `container_extension` instead of assuming MP4.
 
-**Known limits.** A cold start still spends ~30 s decoding the 52k-title JSON from disk before the
-movie rows and hero appear; Home shows live content immediately and the catalogues fill in after.
-Moving the catalogue to Room with indexed paging is the next optimisation. Some VOD files are
-HEVC/MKV and fail on older devices with "stream not supported" — a device codec limit, not a
-provider error. Catch-up/archive playback is still pending.
+**Countries.** `CountryResolver` maps leading tokens (`USA |`, `CAN|`, `CH |`, `NC /`) with a
+curated alias set and falls back to country-named categories. Channel names are stored cleaned and
+`LiveChannel.countryCode` drives the guide's country filter. 643 of 1,194 channels map to 23
+countries; the rest are “Other”. Unrecognised tokens such as `NCAA`, `TNT` and `CINE` are not
+treated as countries.
+
+**TMDB.** Optional enrichment reads `tmdb.read.token` / `tmdb.api.key` from the gitignored
+`local.properties` into `BuildConfig`. Provider identity and playback fields always win; TMDB
+supplies overview, cast, genres, runtime, certification and fills missing posters/backdrops.
+Matching strips quality tags, compares localised and original titles, and requires a compatible
+year. Movie/series details enrich on open, episode stills cover the first three seasons, and a
+bounded backfill (60 movies + 40 series) runs after sync. Matches are cached for 30 days. Without a
+key the app runs on provider metadata only. The key is compiled into `BuildConfig` and is
+extractable from the APK; rotate it if it is ever abused.
+
+**Known limits.** The first catalogue sync still parses the 16.6 MB JSON; later launches query Room
+and reach the hero in ~6 s. Some VOD files are HEVC/MKV and fail on older devices with "stream not
+supported" — a device codec limit, not a provider error. Catch-up/archive playback is still pending.
 
 Verified on the Fire TV (2026-10-24): live login and playback; movie grid with posters and captions;
 movie detail with backdrop, runtime, genre, plot and cast from `get_vod_info`; movie playback;
 series grid; series detail with seasons/episodes and episode playback; search across live, movies
-and series.
+and series; cleaned channel names and a country-filtered guide; Room-backed instant grids; TMDB
+backdrop/overview on a movie detail.
 
 ## 1. What is known (legacy EZServer paths)
 

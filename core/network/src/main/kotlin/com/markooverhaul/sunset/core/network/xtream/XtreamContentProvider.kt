@@ -1,6 +1,14 @@
 package com.markooverhaul.sunset.core.network.xtream
 
 import android.util.Base64
+import com.markooverhaul.sunset.core.database.CatalogueDao
+import com.markooverhaul.sunset.core.database.CatalogueEpisodeEntity
+import com.markooverhaul.sunset.core.database.CatalogueMetaEntity
+import com.markooverhaul.sunset.core.database.CatalogueMovieEntity
+import com.markooverhaul.sunset.core.database.CatalogueSeriesEntity
+import com.markooverhaul.sunset.core.database.toDetail
+import com.markooverhaul.sunset.core.database.toDomain
+import com.markooverhaul.sunset.core.database.toSummary
 import com.markooverhaul.sunset.core.model.AccountSummary
 import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.model.CategoryType
@@ -14,20 +22,22 @@ import com.markooverhaul.sunset.core.model.PagedResult
 import com.markooverhaul.sunset.core.model.ProviderError
 import com.markooverhaul.sunset.core.model.ProviderStatus
 import com.markooverhaul.sunset.core.model.SearchResults
-import com.markooverhaul.sunset.core.model.Season
 import com.markooverhaul.sunset.core.model.SeriesDetail
 import com.markooverhaul.sunset.core.model.SeriesSummary
 import com.markooverhaul.sunset.core.model.Session
 import com.markooverhaul.sunset.core.model.StreamFormat
 import com.markooverhaul.sunset.core.model.StreamRequest
 import com.markooverhaul.sunset.core.model.StreamSource
+import com.markooverhaul.sunset.core.network.tmdb.TmdbEnricher
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -38,25 +48,34 @@ import kotlinx.serialization.decodeFromString
  *
  * Covers authentication, account information, live categories/channels and playback, plus the VOD
  * and series catalogues with their detail responses. Catalogue lists are large (the reference panel
- * returns 52k movies in a 16.6 MB payload), so they are fetched once, cached on disk for six hours
- * and paged in memory. EPG is still the next slice.
+ * returns 52k movies in a 16.6 MB payload), so they are stored in Room and paged with indexed
+ * queries. The raw JSON is still cached for six hours so a failed sync does not refetch it.
  */
 @Singleton
 class XtreamContentProvider @Inject constructor(
     private val api: XtreamApi,
     private val cache: XtreamCache,
+    private val catalogueDao: CatalogueDao,
+    private val tmdb: TmdbEnricher,
 ) : ContentProvider {
 
     private val mutex = Mutex()
 
-    /** Separate lock: a 16 MB VOD download must not block live channel requests. */
+    /** Serialises catalogue syncs; the catalogue lives in Room, not in a 16 MB in-memory list. */
     private val catalogueMutex = Mutex()
+
+    private val categoryMutex = Mutex()
+
+    private val providerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
     private var credentials: XtreamCredentials? = null
 
     @Volatile
     private var account: XtreamAuthResponse? = null
+
+    @Volatile
+    private var accountKey: String? = null
 
     @Volatile
     private var categories: List<Category>? = null
@@ -70,23 +89,10 @@ class XtreamContentProvider @Inject constructor(
     @Volatile
     private var seriesCategories: List<Category>? = null
 
-    @Volatile
-    private var movies: List<MovieEntry>? = null
-
-    @Volatile
-    private var series: List<SeriesEntry>? = null
-
     private val guideMutex = Mutex()
 
     @Volatile
     private var guide: List<EpgProgramme>? = null
-
-    private val movieDetails = mutableMapOf<String, Movie>()
-
-    private val seriesDetails = mutableMapOf<String, SeriesDetail>()
-
-    /** stream/episode id -> container extension, used to build playback URLs. */
-    private val streamExtensions = ConcurrentHashMap<String, String>()
 
     override val status: ProviderStatus
         get() = credentials?.let { ProviderStatus.Configured("Sunset live service") }
@@ -165,157 +171,99 @@ class XtreamContentProvider @Inject constructor(
         return all.filter { it.endUtcMs > from && it.startUtcMs < to }
     }
 
-    override suspend fun getMovieCategories(): List<Category> = catalogueMutex.withLock {
+    override suspend fun getMovieCategories(): List<Category> = categoryMutex.withLock {
         movieCategories ?: loadCategories("vod_categories", "get_vod_categories", CategoryType.MOVIE)
             .also { movieCategories = it }
     }
 
     override suspend fun getMovies(categoryId: String?, page: Int): PagedResult<Movie> {
-        val all = catalogueMutex.withLock {
-            movies ?: loadMovies().also { movies = it }
+        ensureCatalogue()
+        val safePage = page.coerceAtLeast(1)
+        val offset = (safePage - 1) * PAGE_SIZE
+        val total = if (categoryId.isNullOrBlank()) {
+            catalogueDao.movieCount()
+        } else {
+            catalogueDao.movieCount(categoryId)
         }
-        val filtered = if (categoryId.isNullOrBlank()) all else all.filter { it.categoryId == categoryId }
-        return pageOf(filtered, page) { it.movie }
+        val items = if (categoryId.isNullOrBlank()) {
+            catalogueDao.moviesPage(PAGE_SIZE, offset)
+        } else {
+            catalogueDao.moviesPage(categoryId, PAGE_SIZE, offset)
+        }
+        val totalPages = maxOf(1, (total + PAGE_SIZE - 1) / PAGE_SIZE)
+        return PagedResult(
+            items = items.map { it.toDomain() },
+            page = safePage,
+            totalPages = totalPages,
+            hasMore = offset + items.size < total,
+        )
     }
 
     override suspend fun getMovie(id: String): Movie? {
-        movieDetails[id]?.let { return it }
-        val entry = catalogueMutex.withLock {
-            movies?.firstOrNull { it.movie.id == id }
-                ?: loadMovies().also { movies = it }.firstOrNull { it.movie.id == id }
-        } ?: return null
-        val credentials = credentials ?: throw ProviderError.ServiceNotConfigured
-        val body = runCatching {
-            api.call(
-                credentials.baseUrl,
-                credentials.username,
-                credentials.password,
-                action = "get_vod_info",
-                params = mapOf("vod_id" to id),
-            )
-        }.getOrNull()
-        val info = body?.let {
-            runCatching { XtreamApi.json.decodeFromString<XtreamVodInfoResponse>(it) }.getOrNull()
-        }
-        val enriched = entry.movie.copy(
-            plot = info?.info?.plot?.takeIf { it.isNotBlank() } ?: entry.movie.plot,
-            cast = splitPeople(info?.info?.cast).ifEmpty { entry.movie.cast },
-            director = info?.info?.director?.takeIf { it.isNotBlank() } ?: entry.movie.director,
-            genres = splitGenres(info?.info?.genre).ifEmpty { entry.movie.genres },
-            durationMinutes = parseDurationMinutes(info?.info?.duration) ?: entry.movie.durationMinutes,
-            backdropUrl = info?.info?.backdrop?.firstOrNull { it.isNotBlank() }
-                ?: entry.movie.backdropUrl,
-            certification = entry.movie.certification,
-        )
-        movieDetails[id] = enriched
-        return enriched
+        ensureCatalogue()
+        var entity = catalogueDao.movie(id) ?: return null
+        entity = enrichMovie(entity)
+        return entity.toDomain()
     }
 
-    override suspend fun getSeriesCategories(): List<Category> = catalogueMutex.withLock {
+    override suspend fun getSeriesCategories(): List<Category> = categoryMutex.withLock {
         seriesCategories
             ?: loadCategories("series_categories", "get_series_categories", CategoryType.SERIES)
                 .also { seriesCategories = it }
     }
 
     override suspend fun getSeries(categoryId: String?, page: Int): PagedResult<SeriesSummary> {
-        val all = catalogueMutex.withLock {
-            series ?: loadSeries().also { series = it }
+        ensureCatalogue()
+        val safePage = page.coerceAtLeast(1)
+        val offset = (safePage - 1) * PAGE_SIZE
+        val total = if (categoryId.isNullOrBlank()) {
+            catalogueDao.seriesCount()
+        } else {
+            catalogueDao.seriesCount(categoryId)
         }
-        val filtered = if (categoryId.isNullOrBlank()) all else all.filter { it.categoryId == categoryId }
-        return pageOf(filtered, page) { it.summary }
+        val items = if (categoryId.isNullOrBlank()) {
+            catalogueDao.seriesPage(PAGE_SIZE, offset)
+        } else {
+            catalogueDao.seriesPage(categoryId, PAGE_SIZE, offset)
+        }
+        val totalPages = maxOf(1, (total + PAGE_SIZE - 1) / PAGE_SIZE)
+        return PagedResult(
+            items = items.map { it.toSummary() },
+            page = safePage,
+            totalPages = totalPages,
+            hasMore = offset + items.size < total,
+        )
     }
 
     override suspend fun getSeriesDetail(id: String): SeriesDetail? {
-        seriesDetails[id]?.let { return it }
-        val entry = catalogueMutex.withLock {
-            series?.firstOrNull { it.summary.id == id }
-                ?: loadSeries().also { series = it }.firstOrNull { it.summary.id == id }
-        } ?: return null
-        val credentials = credentials ?: throw ProviderError.ServiceNotConfigured
-        val response = runCatching {
-            api.call(
-                credentials.baseUrl,
-                credentials.username,
-                credentials.password,
-                action = "get_series_info",
-                params = mapOf("series_id" to id),
-            )
-        }.getOrNull()?.let {
-            runCatching { XtreamApi.json.decodeFromString<XtreamSeriesInfoResponse>(it) }.getOrNull()
-        } ?: return entry.summary.let { SeriesDetail(summary = it) }
-
-        val info = response.info
-        val summary = entry.summary.copy(
-            title = info?.name?.takeIf { it.isNotBlank() } ?: entry.summary.title,
-            posterUrl = info?.cover?.takeIf { it.isNotBlank() } ?: entry.summary.posterUrl,
-            backdropUrl = info?.backdrop?.firstOrNull { it.isNotBlank() } ?: entry.summary.backdropUrl,
-            rating = info?.rating?.toDoubleOrNull() ?: entry.summary.rating,
-            genres = splitGenres(info?.genre).ifEmpty { entry.summary.genres },
-        )
-        val seasons = response.episodes.entries
-            .mapNotNull { (seasonKey, episodes) ->
-                seasonKey.toIntOrNull()?.let { it to episodes }
-            }
-            .sortedBy { it.first }
-            .map { (seasonNumber, episodes) ->
-                Season(
-                    number = seasonNumber,
-                    episodes = episodes
-                        .sortedBy { it.episodeNum }
-                        .map { episode ->
-                            streamExtensions[episode.id] =
-                                episode.containerExtension.ifBlank { DEFAULT_EXTENSION }
-                            Episode(
-                                id = episode.id,
-                                seriesId = id,
-                                seasonNumber = seasonNumber,
-                                episodeNumber = episode.episodeNum,
-                                title = episode.title.ifBlank { "Episode ${episode.episodeNum}" },
-                                plot = episode.info?.plot?.takeIf { it.isNotBlank() },
-                                durationMinutes = parseDurationMinutes(episode.info?.duration),
-                                stillUrl = episode.info?.image?.takeIf { it.isNotBlank() },
-                                airDateUtcMs = parseDateUtcMs(episode.info?.releaseDate),
-                                streamRef = episode.id,
-                            )
-                        },
-                )
-            }
-        val detail = SeriesDetail(
-            summary = summary.copy(seasonCount = seasons.size.coerceAtLeast(summary.seasonCount)),
-            plot = info?.plot?.takeIf { it.isNotBlank() },
-            cast = splitPeople(info?.cast),
-            seasons = seasons,
-        )
-        seriesDetails[id] = detail
-        return detail
+        ensureCatalogue()
+        var entity = catalogueDao.series(id) ?: return null
+        entity = enrichSeries(entity)
+        if (entity.episodesSyncedAtUtcMs == 0L) {
+            syncSeriesEpisodes(entity)
+            entity = catalogueDao.series(id) ?: entity
+        }
+        var episodes = catalogueDao.episodes(id)
+        tmdb.enrichSeasons(entity, episodes)
+        episodes = catalogueDao.episodes(id)
+        return entity.toDetail(episodes)
     }
 
-    override suspend fun getEpisodes(seriesId: String, season: Int): List<Episode> =
-        getSeriesDetail(seriesId)?.seasons?.firstOrNull { it.number == season }?.episodes.orEmpty()
+    override suspend fun getEpisodes(seriesId: String, season: Int): List<Episode> {
+        getSeriesDetail(seriesId)
+        return catalogueDao.episodes(seriesId, season).map { it.toDomain() }
+    }
 
     override suspend fun search(query: String): SearchResults {
         val term = query.trim()
         if (term.length < MIN_QUERY) return SearchResults()
+        ensureCatalogue()
         val liveMatches = mutex.withLock {
             val all = channels ?: loadChannels()
             all.filter { it.name.contains(term, ignoreCase = true) }
         }
-        val movieMatches = catalogueMutex.withLock {
-            (movies ?: loadMovies().also { movies = it })
-                .asSequence()
-                .map { it.movie }
-                .filter { it.title.contains(term, ignoreCase = true) }
-                .take(MAX_RESULTS)
-                .toList()
-        }
-        val seriesMatches = catalogueMutex.withLock {
-            (series ?: loadSeries().also { series = it })
-                .asSequence()
-                .map { it.summary }
-                .filter { it.title.contains(term, ignoreCase = true) }
-                .take(MAX_RESULTS)
-                .toList()
-        }
+        val movieMatches = catalogueDao.searchMovies(term, MAX_RESULTS).map { it.toDomain() }
+        val seriesMatches = catalogueDao.searchSeries(term, MAX_RESULTS).map { it.toSummary() }
         return SearchResults(
             live = liveMatches.take(MAX_RESULTS),
             movies = movieMatches,
@@ -335,7 +283,8 @@ class XtreamContentProvider @Inject constructor(
             )
 
             ContentType.MOVIE -> {
-                val ext = streamExtensions[request.contentId] ?: DEFAULT_EXTENSION
+                val ext = catalogueDao.movie(request.contentId)?.containerExtension
+                    ?: DEFAULT_EXTENSION
                 StreamSource(
                     url = "$base/movie/$user/$pass/${encodeSegment(request.contentId)}.$ext",
                     format = formatOf(ext),
@@ -344,7 +293,7 @@ class XtreamContentProvider @Inject constructor(
 
             ContentType.SERIES, ContentType.EPISODE -> {
                 val id = request.episodeId ?: request.contentId
-                val ext = streamExtensions[id] ?: DEFAULT_EXTENSION
+                val ext = catalogueDao.episode(id)?.containerExtension ?: DEFAULT_EXTENSION
                 StreamSource(
                     url = "$base/series/$user/$pass/${encodeSegment(id)}.$ext",
                     format = formatOf(ext),
@@ -355,13 +304,22 @@ class XtreamContentProvider @Inject constructor(
 
     private suspend fun loadChannels(): List<LiveChannel> {
         val body = cached("live_streams", "get_live_streams")
+        val categoryNames = runCatching {
+            XtreamApi.json
+                .decodeFromString<List<XtreamCategoryDto>>(cached("live_categories", "get_live_categories"))
+                .associate { it.id to it.name }
+        }.getOrDefault(emptyMap())
         val mapped = XtreamApi.json
             .decodeFromString<List<XtreamLiveStreamDto>>(body)
             .mapIndexedNotNull { index, dto ->
                 if (dto.streamId.isBlank()) return@mapIndexedNotNull null
+                val resolved = CountryResolver.resolve(
+                    rawName = dto.name,
+                    categoryName = categoryNames[dto.categoryId],
+                )
                 LiveChannel(
                     id = dto.streamId,
-                    name = dto.name.ifBlank { "Channel ${dto.streamId}" },
+                    name = resolved.name.ifBlank { "Channel ${dto.streamId}" },
                     number = dto.num.takeIf { it > 0 } ?: (index + 1),
                     logoUrl = dto.streamIcon.takeIf { it.isNotBlank() },
                     categoryIds = listOfNotNull(dto.categoryId.takeIf { it.isNotBlank() }),
@@ -369,6 +327,7 @@ class XtreamContentProvider @Inject constructor(
                     epgChannelId = dto.epgChannelId.takeIf { it.isNotBlank() },
                     hasCatchUp = dto.tvArchive == 1,
                     catchUpDays = dto.tvArchiveDuration,
+                    countryCode = resolved.countryCode,
                 )
             }
         channels = mapped
@@ -425,86 +384,201 @@ class XtreamContentProvider @Inject constructor(
         }
     }
 
-    private suspend fun loadMovies(): List<MovieEntry> {
-        val body = cached("vod_streams", "get_vod_streams")
-        return withContext(Dispatchers.IO) {
-            XtreamApi.json
-                .decodeFromString<List<XtreamVodStreamDto>>(body)
-                .mapNotNull { dto ->
-                    if (dto.streamId.isBlank()) return@mapNotNull null
-                    val (title, year) = splitTitleYear(dto.name)
-                    val extension = dto.containerExtension.ifBlank { DEFAULT_EXTENSION }
-                    streamExtensions[dto.streamId] = extension
-                    MovieEntry(
-                        movie = Movie(
-                            id = dto.streamId,
-                            title = title,
-                            year = year,
-                            posterUrl = dto.streamIcon.takeIf { it.isNotBlank() },
-                            rating = dto.rating.toDoubleOrNull(),
-                            addedAtUtcMs = dto.added.toLongOrNull()?.times(1000L) ?: 0L,
-                            streamRef = dto.streamId,
-                        ),
-                        categoryId = dto.categoryId,
-                        extension = extension,
-                    )
+    private suspend fun ensureCatalogue() {
+        val credentials = credentials ?: throw ProviderError.ServiceNotConfigured
+        val key = accountKey ?: return
+        val meta = catalogueDao.metaFor(key)
+        if (meta != null && meta.movieCount > 0) {
+            if (System.currentTimeMillis() - meta.lastSyncUtcMs > CATALOGUE_TTL_MS) {
+                providerScope.launch {
+                    catalogueMutex.withLock {
+                        runCatching { syncCatalogue(credentials, key) }
+                    }
                 }
+            }
+            return
+        }
+
+        catalogueMutex.withLock {
+            val again = catalogueDao.metaFor(key)
+            if (again != null && again.movieCount > 0) return
+            val existing = catalogueDao.meta()
+            if (existing != null && existing.accountKey != key) {
+                catalogueDao.clearCatalogue()
+                cache.clear()
+                cache.write(ACCOUNT_KEY, key)
+            }
+            syncCatalogue(credentials, key)
         }
     }
 
-    private suspend fun loadSeries(): List<SeriesEntry> {
-        val body = cached("series", "get_series")
-        return withContext(Dispatchers.IO) {
-            XtreamApi.json
-                .decodeFromString<List<XtreamSeriesDto>>(body)
-                .mapNotNull { dto ->
-                    if (dto.seriesId.isBlank()) return@mapNotNull null
-                    SeriesEntry(
-                        summary = SeriesSummary(
-                            id = dto.seriesId,
-                            title = dto.name,
-                            year = dto.releaseDate.take(4).toIntOrNull(),
-                            posterUrl = dto.cover.takeIf { it.isNotBlank() },
-                            rating = dto.rating.toDoubleOrNull(),
-                            genres = splitGenres(dto.genre),
-                            streamRef = dto.seriesId,
-                        ),
-                        categoryId = dto.categoryId,
-                    )
-                }
-        }
-    }
-
-    private fun <T, R> pageOf(
-        entries: List<T>,
-        page: Int,
-        mapper: (T) -> R,
-    ): PagedResult<R> {
-        val totalPages = maxOf(1, (entries.size + PAGE_SIZE - 1) / PAGE_SIZE)
-        val safePage = page.coerceIn(1, totalPages)
-        val start = (safePage - 1) * PAGE_SIZE
-        if (start >= entries.size) {
-            return PagedResult(emptyList(), safePage, totalPages, hasMore = false)
-        }
-        val end = minOf(start + PAGE_SIZE, entries.size)
-        return PagedResult(
-            items = entries.subList(start, end).map(mapper),
-            page = safePage,
-            totalPages = totalPages,
-            hasMore = safePage < totalPages,
+    private suspend fun syncCatalogue(credentials: XtreamCredentials, key: String) {
+        // `cached` downloads once and keeps the raw payload for six hours, so a failed insert can be
+        // retried without pulling another 16 MB.
+        val moviesBody = cached("vod_streams", "get_vod_streams")
+        val seriesBody = cached("series", "get_series")
+        val movies = withContext(Dispatchers.IO) { parseMovieEntities(moviesBody) }
+        val series = withContext(Dispatchers.IO) { parseSeriesEntities(seriesBody) }
+        catalogueDao.replaceCatalogue(
+            meta = CatalogueMetaEntity(
+                accountKey = key,
+                lastSyncUtcMs = System.currentTimeMillis(),
+                movieCount = movies.size,
+                seriesCount = series.size,
+            ),
+            movies = movies,
+            series = series,
         )
+        providerScope.launch {
+            runCatching { backfillArtwork() }
+        }
+    }
+
+    /**
+     * Fills missing card artwork for the most recent titles. Bounded and sequential so a catalogue
+     * with tens of thousands of titles never turns into a TMDB crawl.
+     */
+    private suspend fun backfillArtwork() {
+        if (!tmdb.isConfigured) return
+        catalogueDao.moviesMissingArtwork(60).forEach { movie ->
+            runCatching { tmdb.enrichMovie(movie) }
+        }
+        catalogueDao.seriesMissingArtwork(40).forEach { series ->
+            runCatching { tmdb.enrichSeries(series) }
+        }
+    }
+
+    private fun parseMovieEntities(body: String): List<CatalogueMovieEntity> =
+        XtreamApi.json
+            .decodeFromString<List<XtreamVodStreamDto>>(body)
+            .mapNotNull { dto ->
+                if (dto.streamId.isBlank()) return@mapNotNull null
+                val (title, year) = splitTitleYear(dto.name)
+                CatalogueMovieEntity(
+                    id = dto.streamId,
+                    categoryId = dto.categoryId,
+                    title = title,
+                    year = year,
+                    posterUrl = dto.streamIcon.takeIf { it.isNotBlank() },
+                    rating = dto.rating.toDoubleOrNull(),
+                    addedAtUtcMs = dto.added.toLongOrNull()?.times(1000L) ?: 0L,
+                    streamRef = dto.streamId,
+                    containerExtension = dto.containerExtension.ifBlank { DEFAULT_EXTENSION },
+                )
+            }
+
+    private fun parseSeriesEntities(body: String): List<CatalogueSeriesEntity> =
+        XtreamApi.json
+            .decodeFromString<List<XtreamSeriesDto>>(body)
+            .mapNotNull { dto ->
+                if (dto.seriesId.isBlank()) return@mapNotNull null
+                CatalogueSeriesEntity(
+                    id = dto.seriesId,
+                    categoryId = dto.categoryId,
+                    title = dto.name,
+                    year = dto.releaseDate.take(4).toIntOrNull(),
+                    posterUrl = dto.cover.takeIf { it.isNotBlank() },
+                    rating = dto.rating.toDoubleOrNull(),
+                    genres = splitGenres(dto.genre).joinToString(", "),
+                    streamRef = dto.seriesId,
+                )
+            }
+
+    /** Lazily loads `get_vod_info` once per title and then applies the TMDB layer. */
+    private suspend fun enrichMovie(entity: CatalogueMovieEntity): CatalogueMovieEntity {
+        if (entity.detailSyncedAtUtcMs > 0L) return tmdb.enrichMovie(entity)
+        val credentials = credentials ?: return entity
+        val body = runCatching {
+            api.call(
+                credentials.baseUrl,
+                credentials.username,
+                credentials.password,
+                action = "get_vod_info",
+                params = mapOf("vod_id" to entity.id),
+            )
+        }.getOrNull() ?: return tmdb.enrichMovie(entity)
+        val info = runCatching {
+            XtreamApi.json.decodeFromString<XtreamVodInfoResponse>(body)
+        }.getOrNull() ?: return tmdb.enrichMovie(entity)
+        val enriched = entity.copy(
+            plot = info.info?.plot?.takeIf { it.isNotBlank() } ?: entity.plot,
+            cast = splitPeople(info.info?.cast).joinToString(", ").ifBlank { entity.cast },
+            director = info.info?.director?.takeIf { it.isNotBlank() } ?: entity.director,
+            genres = splitGenres(info.info?.genre).joinToString(", ").ifBlank { entity.genres },
+            durationMinutes = parseDurationMinutes(info.info?.duration) ?: entity.durationMinutes,
+            backdropUrl = info.info?.backdrop?.firstOrNull { it.isNotBlank() }
+                ?: entity.backdropUrl,
+            detailSyncedAtUtcMs = System.currentTimeMillis(),
+        )
+        catalogueDao.updateMovie(enriched)
+        return tmdb.enrichMovie(enriched)
+    }
+
+    private suspend fun enrichSeries(entity: CatalogueSeriesEntity): CatalogueSeriesEntity =
+        tmdb.enrichSeries(entity)
+
+    private suspend fun syncSeriesEpisodes(entity: CatalogueSeriesEntity) {
+        val credentials = credentials ?: return
+        val response = runCatching {
+            api.call(
+                credentials.baseUrl,
+                credentials.username,
+                credentials.password,
+                action = "get_series_info",
+                params = mapOf("series_id" to entity.id),
+            )
+        }.getOrNull()?.let {
+            runCatching { XtreamApi.json.decodeFromString<XtreamSeriesInfoResponse>(it) }.getOrNull()
+        } ?: return
+
+        val info = response.info
+        val episodes = mutableListOf<CatalogueEpisodeEntity>()
+        response.episodes.forEach { (seasonKey, items) ->
+            val seasonNumber = seasonKey.toIntOrNull() ?: return@forEach
+            items.forEach { episode ->
+                if (episode.id.isBlank()) return@forEach
+                episodes += CatalogueEpisodeEntity(
+                    id = episode.id,
+                    seriesId = entity.id,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episode.episodeNum,
+                    title = episode.title.ifBlank { "Episode ${episode.episodeNum}" },
+                    plot = episode.info?.plot?.takeIf { it.isNotBlank() },
+                    durationMinutes = parseDurationMinutes(episode.info?.duration),
+                    stillUrl = episode.info?.image?.takeIf { it.isNotBlank() },
+                    airDateUtcMs = parseDateUtcMs(episode.info?.releaseDate),
+                    streamRef = episode.id,
+                    containerExtension = episode.containerExtension.ifBlank { DEFAULT_EXTENSION },
+                )
+            }
+        }
+        val now = System.currentTimeMillis()
+        val updated = entity.copy(
+            title = info?.name?.takeIf { it.isNotBlank() } ?: entity.title,
+            posterUrl = info?.cover?.takeIf { it.isNotBlank() } ?: entity.posterUrl,
+            backdropUrl = info?.backdrop?.firstOrNull { it.isNotBlank() } ?: entity.backdropUrl,
+            rating = info?.rating?.toDoubleOrNull() ?: entity.rating,
+            genres = splitGenres(info?.genre).joinToString(", ").ifBlank { entity.genres },
+            plot = info?.plot?.takeIf { it.isNotBlank() } ?: entity.plot,
+            cast = splitPeople(info?.cast).joinToString(", ").ifBlank { entity.cast },
+            seasonCount = maxOf(entity.seasonCount, episodes.map { it.seasonNumber }.distinct().size),
+            episodesSyncedAtUtcMs = now,
+        )
+        catalogueDao.updateSeries(updated)
+        catalogueDao.replaceEpisodes(entity.id, episodes, now)
     }
 
     /** Titles arrive as "Name (1999)" or "Name (1999) SUB"; split the year for the caption. */
     private fun splitTitleYear(raw: String): Pair<String, Int?> {
         val match = TITLE_YEAR.find(raw) ?: return raw.trim() to null
         val year = match.groupValues[1].toIntOrNull()
-        val title = raw.removeRange(match.range)
+        val withoutYear = raw.removeRange(match.range)
             .replace(WHITESPACE, " ")
             .trim()
             .trimEnd('-', '–')
             .trim()
-        return (title.ifBlank { raw.trim() }) to year
+        val title = withoutYear.replace(QUALITY_SUFFIX, "").trim()
+        return (title.ifBlank { withoutYear.ifBlank { raw.trim() } }) to year
     }
 
     private fun splitPeople(raw: String?): List<String> =
@@ -573,18 +647,14 @@ class XtreamContentProvider @Inject constructor(
         // Keep the catalogue cache across launches: only drop it when a different account signs in.
         // Wiping on every restore forced a full 16 MB VOD download each cold start.
         val accountKey = "${credentials.baseUrl}|${credentials.username}"
+        this.accountKey = accountKey
         val cachedAccount = cache.read(ACCOUNT_KEY, maxAgeMs = Long.MAX_VALUE)
         if (cachedAccount != accountKey) {
             categories = null
             channels = null
             movieCategories = null
             seriesCategories = null
-            movies = null
-            series = null
             guide = null
-            movieDetails.clear()
-            seriesDetails.clear()
-            streamExtensions.clear()
             cache.clear()
             cache.write(ACCOUNT_KEY, accountKey)
         }
@@ -607,24 +677,17 @@ class XtreamContentProvider @Inject constructor(
         const val DEFAULT_EXTENSION = "mp4"
         const val ACCOUNT_KEY = "account"
         const val GUIDE_KEY = "xmltv"
+        const val CATALOGUE_TTL_MS = 6 * 60 * 60 * 1000L
         const val HOUR_MS = 60 * 60 * 1000L
         const val DAY_MS = 24 * HOUR_MS
         val TITLE_YEAR = Regex("""\((\d{4})\)""")
         val WHITESPACE = Regex("""\s+""")
+        val QUALITY_SUFFIX = Regex(
+            """\s+(?:SUB|DUB|LAT|LATINO|CAST|ESP|ING|HD|FHD|UHD|4K)$""",
+            RegexOption.IGNORE_CASE,
+        )
     }
 }
-
-/** A movie plus the fields needed for category filtering and playback. */
-private data class MovieEntry(
-    val movie: Movie,
-    val categoryId: String,
-    val extension: String,
-)
-
-private data class SeriesEntry(
-    val summary: SeriesSummary,
-    val categoryId: String,
-)
 
 /**
  * Xtream has no bearer token: every call repeats the credentials, so the session token carries

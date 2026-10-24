@@ -23,6 +23,8 @@ data class LiveChannel(
     val epgChannelId: String? = id,
     val hasCatchUp: Boolean = false,
     val catchUpDays: Int = 0,
+    /** ISO-ish country code inferred from the channel prefix or its country category. */
+    val countryCode: String? = null,
 )
 
 data class EpgProgramme(

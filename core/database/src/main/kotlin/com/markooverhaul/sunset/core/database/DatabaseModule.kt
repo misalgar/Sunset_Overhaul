@@ -28,4 +28,7 @@ object DatabaseModule {
 
     @Provides
     fun provideSearchHistoryDao(database: SunsetDatabase): SearchHistoryDao = database.searchHistoryDao()
+
+    @Provides
+    fun provideCatalogueDao(database: SunsetDatabase): CatalogueDao = database.catalogueDao()
 }

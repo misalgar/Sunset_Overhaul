@@ -20,6 +20,8 @@ val localProperties = Properties().apply {
     if (file.isFile) file.inputStream().use { load(it) }
 }
 val providerHostValue = localProperties.getProperty("sunset.provider.host")?.trim().orEmpty()
+val tmdbReadToken = localProperties.getProperty("tmdb.read.token")?.trim().orEmpty()
+val tmdbApiKey = localProperties.getProperty("tmdb.api.key")?.trim().orEmpty()
 
 abstract class GenerateNetworkSecurityConfig : DefaultTask() {
     @get:Input
@@ -90,6 +92,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        // Machine-local TMDB credentials; never committed. Empty values disable enrichment.
+        buildConfigField("String", "TMDB_READ_TOKEN", "\"${tmdbReadToken.replace("\"", "\\\"")}\"")
+        buildConfigField("String", "TMDB_API_KEY", "\"${tmdbApiKey.replace("\"", "\\\"")}\"")
     }
 
     buildFeatures {

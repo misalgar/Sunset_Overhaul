@@ -78,41 +78,46 @@ class HomeViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                // Fast path: live data renders immediately.
-                val (channels, guide) = withContext(ioDispatcher) {
-                    coroutineScope {
-                        val channels = async { provider.getLiveChannels() }
-                        val guide = async { provider.getGuide(days = 1) }
-                        channels.await() to guide.await()
-                    }
-                }
                 val now = System.currentTimeMillis()
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        liveNow = channels.take(10),
-                        nowNext = nowNextOf(channels, guide, now),
-                        error = null,
-                    )
-                }
+                coroutineScope {
+                    val channelsDeferred = async(ioDispatcher) { provider.getLiveChannels() }
+                    val guideDeferred = async(ioDispatcher) { provider.getGuide(days = 1) }
+                    val moviesDeferred = async(ioDispatcher) { provider.getMovies(page = 1) }
+                    val seriesDeferred = async(ioDispatcher) { provider.getSeries(page = 1) }
 
-                // Slow path: the VOD and series catalogues are large and cache-backed; Home should
-                // not stay blank while they download on first launch.
-                val (movies, series) = withContext(ioDispatcher) {
-                    coroutineScope {
-                        val movies = async { provider.getMovies(page = 1) }
-                        val series = async { provider.getSeries(page = 1) }
-                        movies.await().items to series.await().items
+                    // Live channel rows are available first; the guide and the Room catalogue then
+                    // fill their slots independently, so a slow XMLTV parse never hides the hero.
+                    val channels = channelsDeferred.await()
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            liveNow = channels.take(10),
+                            error = null,
+                        )
                     }
-                }
-                val recentMovies = movies.sortedByDescending { it.addedAtUtcMs }.take(12)
-                _state.update {
-                    it.copy(
-                        hero = recentMovies.firstOrNull() ?: it.hero,
-                        recentMovies = recentMovies,
-                        recentSeries = series.sortedByDescending { s -> s.addedAtUtcMs }.take(12),
-                        recommended = movies.sortedByDescending { m -> m.rating ?: 0.0 }.take(12),
-                    )
+
+                    launch {
+                        val movies = runCatching { moviesDeferred.await().items }
+                            .getOrDefault(emptyList())
+                        val series = runCatching { seriesDeferred.await().items }
+                            .getOrDefault(emptyList())
+                        val recentMovies = movies.sortedByDescending { it.addedAtUtcMs }.take(12)
+                        _state.update {
+                            it.copy(
+                                hero = recentMovies.firstOrNull() ?: it.hero,
+                                recentMovies = recentMovies,
+                                recentSeries = series.sortedByDescending { s -> s.addedAtUtcMs }
+                                    .take(12),
+                                recommended = movies.sortedByDescending { m -> m.rating ?: 0.0 }
+                                    .take(12),
+                            )
+                        }
+                    }
+
+                    launch {
+                        val guide = runCatching { guideDeferred.await() }.getOrDefault(emptyList())
+                        _state.update { it.copy(nowNext = nowNextOf(channels, guide, now)) }
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled

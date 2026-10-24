@@ -4,12 +4,21 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [FavouriteEntity::class, WatchProgressEntity::class, SearchHistoryEntity::class],
-    version = 1,
+    entities = [
+        FavouriteEntity::class,
+        WatchProgressEntity::class,
+        SearchHistoryEntity::class,
+        CatalogueMetaEntity::class,
+        CatalogueMovieEntity::class,
+        CatalogueSeriesEntity::class,
+        CatalogueEpisodeEntity::class,
+    ],
+    version = 2,
     exportSchema = true,
 )
 abstract class SunsetDatabase : RoomDatabase() {
     abstract fun favouriteDao(): FavouriteDao
     abstract fun watchProgressDao(): WatchProgressDao
     abstract fun searchHistoryDao(): SearchHistoryDao
+    abstract fun catalogueDao(): CatalogueDao
 }
