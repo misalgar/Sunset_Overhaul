@@ -76,6 +76,11 @@ class XtreamContentProvider @Inject constructor(
     @Volatile
     private var series: List<SeriesEntry>? = null
 
+    private val guideMutex = Mutex()
+
+    @Volatile
+    private var guide: List<EpgProgramme>? = null
+
     private val movieDetails = mutableMapOf<String, Movie>()
 
     private val seriesDetails = mutableMapOf<String, SeriesDetail>()
@@ -149,8 +154,16 @@ class XtreamContentProvider @Inject constructor(
         if (categoryId.isNullOrBlank()) all else all.filter { categoryId in it.categoryIds }
     }
 
-    /** EPG arrives with the guide slice; an empty list keeps the UI in its "no guide data" state. */
-    override suspend fun getGuide(days: Int): List<EpgProgramme> = emptyList()
+    override suspend fun getGuide(days: Int): List<EpgProgramme> {
+        val windowDays = days.coerceIn(1, 7)
+        val now = System.currentTimeMillis()
+        val from = now - HOUR_MS
+        val to = now + windowDays * DAY_MS
+        val all = guideMutex.withLock {
+            guide ?: loadGuide().also { guide = it }
+        }
+        return all.filter { it.endUtcMs > from && it.startUtcMs < to }
+    }
 
     override suspend fun getMovieCategories(): List<Category> = catalogueMutex.withLock {
         movieCategories ?: loadCategories("vod_categories", "get_vod_categories", CategoryType.MOVIE)
@@ -362,6 +375,40 @@ class XtreamContentProvider @Inject constructor(
         return mapped
     }
 
+    /**
+     * XMLTV keys programmes by the provider's EPG channel id; the UI matches programmes to
+     * [LiveChannel.id] (the stream id), so translate once while parsing.
+     */
+    private suspend fun loadGuide(): List<EpgProgramme> {
+        val credentials = credentials ?: throw ProviderError.ServiceNotConfigured
+        val body = cache.read(GUIDE_KEY)
+            ?: api.xmltv(credentials.baseUrl, credentials.username, credentials.password)
+                .also { cache.write(GUIDE_KEY, it) }
+        val liveChannels = mutex.withLock { channels ?: loadChannels() }
+        val streamIdByEpgId = liveChannels
+            .mapNotNull { channel -> channel.epgChannelId?.let { it to channel.id } }
+            .toMap()
+        if (streamIdByEpgId.isEmpty()) return emptyList()
+        return withContext(Dispatchers.IO) {
+            XmltvParser.parse(body)
+                .mapNotNull { programme ->
+                    val streamId = streamIdByEpgId[programme.channelId] ?: return@mapNotNull null
+                    EpgProgramme(
+                        id = "${programme.channelId}-${programme.startUtcMs}",
+                        channelId = streamId,
+                        title = programme.title,
+                        description = programme.description,
+                        startUtcMs = programme.startUtcMs,
+                        endUtcMs = programme.endUtcMs,
+                        category = programme.category,
+                        rating = programme.rating,
+                        iconUrl = programme.iconUrl,
+                    )
+                }
+                .sortedBy { it.startUtcMs }
+        }
+    }
+
     private suspend fun loadCategories(
         cacheKey: String,
         action: String,
@@ -534,6 +581,7 @@ class XtreamContentProvider @Inject constructor(
             seriesCategories = null
             movies = null
             series = null
+            guide = null
             movieDetails.clear()
             seriesDetails.clear()
             streamExtensions.clear()
@@ -558,6 +606,9 @@ class XtreamContentProvider @Inject constructor(
         const val PAGE_SIZE = 60
         const val DEFAULT_EXTENSION = "mp4"
         const val ACCOUNT_KEY = "account"
+        const val GUIDE_KEY = "xmltv"
+        const val HOUR_MS = 60 * 60 * 1000L
+        const val DAY_MS = 24 * HOUR_MS
         val TITLE_YEAR = Regex("""\((\d{4})\)""")
         val WHITESPACE = Regex("""\s+""")
     }

@@ -162,7 +162,24 @@ real categories) → channel playback with live broadcast content; session survi
 Verified on the Fire TV: movie grid and captions, movie detail (`get_vod_info`), movie playback,
 series grid, series detail with 12 episodes and cast, episode playback, three-way search.
 
-Next: EPG (`xmltv.php` or `get_short_epg`), series season switching polish, then release binding.
+### 5.7 EPG via XMLTV (2026-10-24)
+
+- `get_short_epg` and `get_simple_data_table` return zero listings on this panel; `xmltv.php`
+  returns a 3.2 MB XMLTV document, so that is the source.
+- `XmltvParser` walks the document once with a pull parser and keeps only the guide fields; no DOM,
+  no 3 MB string kept around beyond the fetch.
+- Programme channel ids are translated to stream ids while parsing, so Home/Live/Guide can match
+  `EpgProgramme.channelId` to `LiveChannel.id` directly.
+- The guide is cached in memory per process and on disk for six hours; `getGuide(days)` windows the
+  result to the requested range.
+- Home and Live group programmes by channel once instead of filtering per channel, and the Guide
+  grid groups per day selection, because the document holds tens of thousands of programmes.
+- Channels without guide data render "No guide data for this channel".
+
+Verified on the Fire TV: On Now cards show programme title and time, the Guide lists a channel's
+timeline with a red "Now" marker, and Home's Live Now rail shows now/next.
+
+Next: catalogue cold-start (Room), release binding, phone/tablet pass.
 
 ## 6. Verification
 

@@ -22,7 +22,7 @@ stream URL is stored in the repository; release builds still bind the fail-close
 | Release fail-closed provider binding | Complete |
 | Live Xtream Codes login, account, live categories/channels, live playback (debug) | Complete |
 | VOD and series catalogues, details, episodes and three-way search from the live panel (debug) | Complete |
-| EPG from the live panel | Next slice |
+| EPG from the live panel (`xmltv.php`) | Complete |
 
 Builds, lint and JVM tests were verified on 2026-10-23; see [Verification](#verification) and
 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for exact commands and results. Manual

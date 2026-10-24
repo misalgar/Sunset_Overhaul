@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -81,6 +82,13 @@ fun GuideScreen(
     val dayStart = GuideViewModel.startOfDay(state.selectedDay)
     val dayEnd = dayStart + DAY_MS
     val now = System.currentTimeMillis()
+    // Group once per day selection: filtering 30k+ programmes for every channel inside the list
+    // would be O(channels x programmes) on each recomposition.
+    val programmesByChannel = remember(state.programmes, dayStart) {
+        state.programmes
+            .filter { it.startUtcMs >= dayStart && it.startUtcMs < dayEnd }
+            .groupBy { it.channelId }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -159,9 +167,7 @@ fun GuideScreen(
 
             else -> {
                 items(state.visibleChannels, key = { it.id }) { channel ->
-                    val programmes = state.programmes.filter {
-                        it.channelId == channel.id && it.startUtcMs >= dayStart && it.startUtcMs < dayEnd
-                    }
+                    val programmes = programmesByChannel[channel.id].orEmpty()
                     ChannelGuideBlock(
                         channel = channel,
                         programmes = programmes,

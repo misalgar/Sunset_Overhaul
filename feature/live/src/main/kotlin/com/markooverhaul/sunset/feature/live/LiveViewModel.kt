@@ -93,10 +93,10 @@ class LiveViewModel @Inject constructor(
                     }
                 }
                 val now = System.currentTimeMillis()
+                // Group once; the guide can hold tens of thousands of programmes.
+                val guideByChannel = payload.third.groupBy { it.channelId }
                 val programmes = payload.second.associate { channel ->
-                    val forChannel = payload.third
-                        .filter { it.channelId == channel.id }
-                        .sortedBy { it.startUtcMs }
+                    val forChannel = guideByChannel[channel.id].orEmpty().sortedBy { it.startUtcMs }
                     channel.id to LiveProgramme(
                         now = forChannel.firstOrNull { now >= it.startUtcMs && now < it.endUtcMs },
                         next = forChannel.firstOrNull { it.startUtcMs > now },

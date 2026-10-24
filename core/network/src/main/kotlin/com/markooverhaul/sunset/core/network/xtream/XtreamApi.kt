@@ -69,6 +69,33 @@ class XtreamApi @Inject constructor() {
         }
     }
 
+    /** Full XMLTV guide (~3.2 MB on the reference panel). */
+    suspend fun xmltv(baseUrl: String, username: String, password: String): String =
+        withContext(Dispatchers.IO) {
+            val url = baseUrl.toHttpUrlOrNull()
+                ?.newBuilder()
+                ?.addPathSegment("xmltv.php")
+                ?.addQueryParameter("username", username)
+                ?.addQueryParameter("password", password)
+                ?.build()
+                ?: throw ProviderError.Network
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .get()
+                .build()
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw statusError(response.code)
+                    response.body?.string()?.takeIf { it.isNotBlank() } ?: throw ProviderError.Server
+                }
+            } catch (error: ProviderError) {
+                throw error
+            } catch (_: IOException) {
+                throw ProviderError.Network
+            }
+        }
+
     fun decodeOrThrow(body: String): XtreamAuthResponse = try {
         json.decodeFromString(XtreamAuthResponse.serializer(), body)
     } catch (_: Throwable) {

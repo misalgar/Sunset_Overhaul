@@ -126,14 +126,17 @@ class HomeViewModel @Inject constructor(
         channels: List<LiveChannel>,
         guide: List<EpgProgramme>,
         now: Long,
-    ): Map<String, ChannelNowNext> = channels.associate { channel ->
-        val programmes = guide
-            .filter { it.channelId == channel.id }
-            .sortedBy { it.startUtcMs }
-        channel.id to ChannelNowNext(
-            now = programmes.firstOrNull { now >= it.startUtcMs && now < it.endUtcMs },
-            next = programmes.firstOrNull { it.startUtcMs > now },
-        )
+    ): Map<String, ChannelNowNext> {
+        // Group once: the guide can hold tens of thousands of programmes and filtering per channel
+        // would be O(channels x programmes) on every refresh.
+        val byChannel = guide.groupBy { it.channelId }
+        return channels.associate { channel ->
+            val programmes = byChannel[channel.id].orEmpty().sortedBy { it.startUtcMs }
+            channel.id to ChannelNowNext(
+                now = programmes.firstOrNull { now >= it.startUtcMs && now < it.endUtcMs },
+                next = programmes.firstOrNull { it.startUtcMs > now },
+            )
+        }
     }
 
 }

@@ -90,9 +90,14 @@ playback remains blocked until there is a stable approved stream-host policy or 
 ### 0.7 Status
 
 Implemented: login, account summary, live categories/channels and playback, the VOD catalogue with
-detail (`get_vod_info`), the series catalogue with detail and episodes (`get_series_info`),
-three-way search, Keystore session storage, a runtime server field and a debug provider router
-(demo vs live).
+detail (`get_vod_info`), the series catalogue with detail and episodes (`get_series_info`), EPG via
+`xmltv.php`, three-way search, Keystore session storage, a runtime server field and a debug provider
+router (demo vs live).
+
+**EPG.** On this panel `get_short_epg` and `get_simple_data_table` return zero listings, but
+`xmltv.php` returns a 3.2 MB XMLTV document. It is fetched once, cached for six hours and parsed
+with a streaming pull parser; programme channel ids (`travelchannel.us`) are translated to the
+stream ids the UI uses. Channels without guide data say so rather than showing blank blocks.
 
 **Catalogue handling.** VOD and series lists are fetched once, cached on disk for six hours and
 paged in memory (60 per page): the panel has no pagination and the VOD payload is 16.6 MB. The cache
@@ -104,7 +109,7 @@ years are split out of names like `Name (1999) SUB`, and playback uses the panel
 movie rows and hero appear; Home shows live content immediately and the catalogues fill in after.
 Moving the catalogue to Room with indexed paging is the next optimisation. Some VOD files are
 HEVC/MKV and fail on older devices with "stream not supported" — a device codec limit, not a
-provider error. EPG and catch-up are still pending.
+provider error. Catch-up/archive playback is still pending.
 
 Verified on the Fire TV (2026-10-24): live login and playback; movie grid with posters and captions;
 movie detail with backdrop, runtime, genre, plot and cast from `get_vod_info`; movie playback;
