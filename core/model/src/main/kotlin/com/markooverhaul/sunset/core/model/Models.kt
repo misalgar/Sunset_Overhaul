@@ -216,6 +216,9 @@ interface ContentProvider {
     suspend fun getLiveChannels(categoryId: String? = null): List<LiveChannel>
     suspend fun getGuide(days: Int = 1): List<EpgProgramme>
 
+    /** Drops any short-lived live caches so the next read reflects a schedule/category change. */
+    suspend fun refreshLive() {}
+
     suspend fun getMovieCategories(): List<Category>
     suspend fun getMovies(categoryId: String? = null, page: Int = 1): PagedResult<Movie>
     suspend fun getMovie(id: String): Movie?
@@ -224,6 +227,10 @@ interface ContentProvider {
     suspend fun getSeries(categoryId: String? = null, page: Int = 1): PagedResult<SeriesSummary>
     suspend fun getSeriesDetail(id: String): SeriesDetail?
     suspend fun getEpisodes(seriesId: String, season: Int): List<Episode>
+
+    /** Playable local titles recommended for a movie/series; empty when enrichment is unavailable. */
+    suspend fun getMovieRecommendations(id: String): List<Movie> = emptyList()
+    suspend fun getSeriesRecommendations(id: String): List<SeriesSummary> = emptyList()
 
     suspend fun search(query: String): SearchResults
 

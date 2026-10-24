@@ -25,7 +25,7 @@ class TmdbEnricher @Inject constructor(
 
     suspend fun enrichMovie(entity: CatalogueMovieEntity): CatalogueMovieEntity {
         if (!api.isConfigured) return entity
-        if (isFresh(entity.tmdbMatchedAtUtcMs)) return entity
+        if (isFresh(entity.tmdbMatchedAtUtcMs, entity.tmdbLanguage)) return entity
         val now = System.currentTimeMillis()
         val results = api.searchMovie(entity.title, entity.year)
         val match = matchTitle(results, entity.title, entity.year)
@@ -33,7 +33,7 @@ class TmdbEnricher @Inject constructor(
             // An empty result set can mean a transient API failure; leave it unmatched so a later
             // attempt can still succeed. Only a real result set with no match is cached.
             if (results.isEmpty()) return entity
-            return entity.copy(tmdbMatchedAtUtcMs = now, tmdbLanguage = api.language)
+            return entity.copy(tmdbMatchedAtUtcMs = now, tmdbLanguage = cacheLanguage)
                 .also { dao.updateMovie(it) }
         }
         val detail = api.movieDetail(match.id) ?: return entity
@@ -56,7 +56,7 @@ class TmdbEnricher @Inject constructor(
             tmdbRuntime = detail.runtime ?: entity.tmdbRuntime,
             tmdbCertification = api.certification(detail.releaseDates) ?: entity.tmdbCertification,
             tmdbMatchedAtUtcMs = now,
-            tmdbLanguage = api.language,
+            tmdbLanguage = cacheLanguage,
         )
         dao.updateMovie(updated)
         return updated
@@ -64,13 +64,13 @@ class TmdbEnricher @Inject constructor(
 
     suspend fun enrichSeries(entity: CatalogueSeriesEntity): CatalogueSeriesEntity {
         if (!api.isConfigured) return entity
-        if (isFresh(entity.tmdbMatchedAtUtcMs)) return entity
+        if (isFresh(entity.tmdbMatchedAtUtcMs, entity.tmdbLanguage)) return entity
         val now = System.currentTimeMillis()
         val results = api.searchSeries(entity.title, entity.year)
         val match = matchTitle(results, entity.title, entity.year)
         if (match == null) {
             if (results.isEmpty()) return entity
-            return entity.copy(tmdbMatchedAtUtcMs = now, tmdbLanguage = api.language)
+            return entity.copy(tmdbMatchedAtUtcMs = now, tmdbLanguage = cacheLanguage)
                 .also { dao.updateSeries(it) }
         }
         val detail = api.seriesDetail(match.id) ?: return entity
@@ -95,7 +95,7 @@ class TmdbEnricher @Inject constructor(
                 ?: entity.tmdbCertification,
             seasonCount = maxOf(entity.seasonCount, detail.numberOfSeasons),
             tmdbMatchedAtUtcMs = now,
-            tmdbLanguage = api.language,
+            tmdbLanguage = cacheLanguage,
         )
         dao.updateSeries(updated)
         return updated
@@ -135,6 +135,70 @@ class TmdbEnricher @Inject constructor(
                 )
             }
         }
+    }
+
+    /**
+     * Resolves TMDB recommendations against the local catalogue so every card is playable.
+     * Titles are matched by normalised localised/original name and a compatible year.
+     */
+    suspend fun movieRecommendations(
+        entity: CatalogueMovieEntity,
+        limit: Int = 12,
+    ): List<CatalogueMovieEntity> {
+        val tmdbId = entity.tmdbId?.toLongOrNull() ?: return emptyList()
+        val results = api.movieRecommendations(tmdbId)
+        if (results.isEmpty()) return emptyList()
+        val seen = mutableSetOf(entity.id)
+        val resolved = mutableListOf<CatalogueMovieEntity>()
+        for (item in results) {
+            val titles = listOf(item.displayTitle, item.displayOriginal)
+                .filter { it.isNotBlank() }
+            val candidates = titles
+                .flatMap { title -> dao.searchMovies(title, 6) }
+                .distinctBy { it.id }
+            val match = candidates.firstOrNull { candidate ->
+                candidate.id !in seen &&
+                    yearsCompatible(item.year, candidate.year) &&
+                    titles.any { title ->
+                        normalize(candidate.title.replace(QUALITY_SUFFIX, " ")) ==
+                            normalize(title)
+                    }
+            } ?: continue
+            seen += match.id
+            resolved += match
+            if (resolved.size >= limit) break
+        }
+        return resolved
+    }
+
+    suspend fun seriesRecommendations(
+        entity: CatalogueSeriesEntity,
+        limit: Int = 12,
+    ): List<CatalogueSeriesEntity> {
+        val tmdbId = entity.tmdbId?.toLongOrNull() ?: return emptyList()
+        val results = api.seriesRecommendations(tmdbId)
+        if (results.isEmpty()) return emptyList()
+        val seen = mutableSetOf(entity.id)
+        val resolved = mutableListOf<CatalogueSeriesEntity>()
+        for (item in results) {
+            val titles = listOf(item.displayTitle, item.displayOriginal)
+                .filter { it.isNotBlank() }
+            val candidates = titles
+                .flatMap { title -> dao.searchSeries(title, 6) }
+                .distinctBy { it.id }
+            val match = candidates.firstOrNull { candidate ->
+                candidate.id !in seen &&
+                    yearsCompatible(item.year, candidate.year) &&
+                    titles.any { title ->
+                        normalize(candidate.title.replace(QUALITY_SUFFIX, " ")) ==
+                            normalize(title)
+                    }
+            } ?: continue
+            seen += match.id
+            resolved += match
+            if (resolved.size >= limit) break
+        }
+        return resolved
     }
 
     private fun matchTitle(
@@ -183,13 +247,20 @@ class TmdbEnricher @Inject constructor(
         matchedAtUtcMs > 0L &&
             System.currentTimeMillis() - matchedAtUtcMs < MATCH_TTL_MS
 
-    private fun normalize(value: String): String =
-        Normalizer.normalize(value, Normalizer.Form.NFD)
+    private fun isFresh(matchedAtUtcMs: Long, storedLanguage: String?): Boolean =
+        isFresh(matchedAtUtcMs) && storedLanguage == cacheLanguage
+
+    private val cacheLanguage: String get() = "${api.language}#$MATCHER_VERSION"
+
+    private fun normalize(value: String): String {
+        val tokens = Normalizer.normalize(value, Normalizer.Form.NFD)
             .replace(Regex("""\p{M}+"""), "")
             .lowercase(Locale.US)
             .replace(Regex("""[^a-z0-9]+"""), " ")
-            .replace(Regex("""\s+"""), " ")
-            .trim()
+            .split(' ')
+            .filter { it.isNotBlank() && it !in STOP_WORDS }
+        return tokens.joinToString(" ")
+    }
 
     private fun parseDate(raw: String?): Long? {
         val value = raw?.trim().orEmpty()
@@ -204,6 +275,11 @@ class TmdbEnricher @Inject constructor(
 
     private companion object {
         const val MATCH_TTL_MS = 30L * 24 * 60 * 60 * 1000
+        const val MATCHER_VERSION = 2
+        val STOP_WORDS = setOf(
+            "and", "the", "of", "a", "an", "y", "e", "de", "del", "la", "el",
+            "los", "las", "le", "les", "et", "und",
+        )
         val QUALITY_SUFFIX = Regex(
             """\s+(?:SUB|DUB|LAT|LATINO|CAST|ESP|ING|HD|FHD|UHD|4K)$""",
             RegexOption.IGNORE_CASE,

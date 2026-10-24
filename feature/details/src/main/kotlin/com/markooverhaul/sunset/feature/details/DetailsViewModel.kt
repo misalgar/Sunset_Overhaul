@@ -111,10 +111,19 @@ class DetailsViewModel @Inject constructor(
             _state.update { it.copy(isLoading = false, error = ProviderError.NotFound) }
             return
         }
-        val similar = withContext(ioDispatcher) {
-            provider.getMovies(page = 1).items
-                .filter { candidate -> candidate.id != movie.id && candidate.genres.any { it in movie.genres } }
-                .take(10)
+        val recommended = withContext(ioDispatcher) {
+            provider.getMovieRecommendations(movie.id)
+        }
+        val similar = if (recommended.isNotEmpty()) {
+            recommended
+        } else {
+            withContext(ioDispatcher) {
+                provider.getMovies(page = 1).items
+                    .filter { candidate ->
+                        candidate.id != movie.id && candidate.genres.any { it in movie.genres }
+                    }
+                    .take(10)
+            }
         }
         _state.update {
             it.copy(
@@ -132,11 +141,21 @@ class DetailsViewModel @Inject constructor(
             _state.update { it.copy(isLoading = false, error = ProviderError.NotFound) }
             return
         }
-        val genres = detail.summary.genres
-        val similar = withContext(ioDispatcher) {
-            provider.getSeries(page = 1).items
-                .filter { candidate -> candidate.id != detail.summary.id && candidate.genres.any { it in genres } }
-                .take(10)
+        val recommended = withContext(ioDispatcher) {
+            provider.getSeriesRecommendations(detail.summary.id)
+        }
+        val similar = if (recommended.isNotEmpty()) {
+            recommended
+        } else {
+            val genres = detail.summary.genres
+            withContext(ioDispatcher) {
+                provider.getSeries(page = 1).items
+                    .filter { candidate ->
+                        candidate.id != detail.summary.id &&
+                            candidate.genres.any { it in genres }
+                    }
+                    .take(10)
+            }
         }
         _state.update {
             it.copy(

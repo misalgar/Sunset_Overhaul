@@ -61,6 +61,8 @@ class RoutingContentProvider @Inject constructor(
 
     override suspend fun getGuide(days: Int): List<EpgProgramme> = active.getGuide(days)
 
+    override suspend fun refreshLive() = active.refreshLive()
+
     override suspend fun getMovieCategories(): List<Category> = active.getMovieCategories()
 
     override suspend fun getMovies(categoryId: String?, page: Int): PagedResult<Movie> =
@@ -77,6 +79,12 @@ class RoutingContentProvider @Inject constructor(
 
     override suspend fun getEpisodes(seriesId: String, season: Int): List<Episode> =
         active.getEpisodes(seriesId, season)
+
+    override suspend fun getMovieRecommendations(id: String): List<Movie> =
+        active.getMovieRecommendations(id)
+
+    override suspend fun getSeriesRecommendations(id: String): List<SeriesSummary> =
+        active.getSeriesRecommendations(id)
 
     override suspend fun search(query: String): SearchResults = active.search(query)
 

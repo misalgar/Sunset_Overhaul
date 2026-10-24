@@ -7,6 +7,7 @@ import com.markooverhaul.sunset.core.model.ContentType
 object SunsetRoutes {
     const val HOME = "home"
     const val LIVE = "live"
+    const val PPV = "ppv"
     const val GUIDE = "guide"
     const val MOVIES = "movies"
     const val SERIES = "series"

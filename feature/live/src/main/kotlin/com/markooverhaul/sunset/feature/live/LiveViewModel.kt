@@ -9,6 +9,7 @@ import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.model.EpgProgramme
 import com.markooverhaul.sunset.core.model.LiveChannel
+import com.markooverhaul.sunset.core.model.isPpvCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -93,9 +94,18 @@ class LiveViewModel @Inject constructor(
                     }
                 }
                 val now = System.currentTimeMillis()
+                // PPV has its own destination; keep its dated categories and channels out of Live TV.
+                val ppvCategoryIds = payload.first
+                    .filter { isPpvCategory(it.name) }
+                    .map { it.id }
+                    .toSet()
+                val liveCategories = payload.first.filterNot { it.id in ppvCategoryIds }
+                val liveChannels = payload.second.filter { channel ->
+                    channel.categoryIds.none { it in ppvCategoryIds }
+                }
                 // Group once; the guide can hold tens of thousands of programmes.
                 val guideByChannel = payload.third.groupBy { it.channelId }
-                val programmes = payload.second.associate { channel ->
+                val programmes = liveChannels.associate { channel ->
                     val forChannel = guideByChannel[channel.id].orEmpty().sortedBy { it.startUtcMs }
                     channel.id to LiveProgramme(
                         now = forChannel.firstOrNull { now >= it.startUtcMs && now < it.endUtcMs },
@@ -105,9 +115,11 @@ class LiveViewModel @Inject constructor(
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        categories = payload.first,
-                        channels = payload.second,
+                        categories = liveCategories,
+                        channels = liveChannels,
                         programmes = programmes,
+                        selectedCategoryId = it.selectedCategoryId
+                            ?.takeIf { id -> liveCategories.any { category -> category.id == id } },
                         error = null,
                     )
                 }

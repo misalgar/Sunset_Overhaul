@@ -66,6 +66,7 @@ private data class BottomNavItem(
 private val LargeNavItems = listOf(
     TopNavItem(SunsetRoutes.HOME, R.string.nav_home),
     TopNavItem(SunsetRoutes.LIVE, R.string.nav_live),
+    TopNavItem(SunsetRoutes.PPV, R.string.nav_ppv),
     TopNavItem(SunsetRoutes.MOVIES, R.string.nav_movies),
     TopNavItem(SunsetRoutes.SERIES, R.string.nav_series),
     TopNavItem(SunsetRoutes.SEARCH_PATTERN, R.string.nav_search),
@@ -92,6 +93,7 @@ private val PhoneTopLevel = setOf(
 private val LargeTopLevel = setOf(
     SunsetRoutes.HOME,
     SunsetRoutes.LIVE,
+    SunsetRoutes.PPV,
     SunsetRoutes.MOVIES,
     SunsetRoutes.SERIES,
     SunsetRoutes.SEARCH_PATTERN,

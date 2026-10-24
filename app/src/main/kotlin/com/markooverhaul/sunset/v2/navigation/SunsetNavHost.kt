@@ -17,6 +17,7 @@ import com.markooverhaul.sunset.feature.details.DetailsViewModel
 import com.markooverhaul.sunset.feature.guide.GuideRoute
 import com.markooverhaul.sunset.feature.home.HomeRoute
 import com.markooverhaul.sunset.feature.live.LiveRoute
+import com.markooverhaul.sunset.feature.live.PpvRoute
 import com.markooverhaul.sunset.feature.movies.MoviesRoute
 import com.markooverhaul.sunset.feature.mylist.MyListRoute
 import com.markooverhaul.sunset.feature.mylist.SavedItem
@@ -108,6 +109,10 @@ fun SunsetNavHost(
             )
         }
 
+        composable(SunsetRoutes.PPV) {
+            PpvRoute(onPlayChannel = ::openChannel)
+        }
+
         composable(SunsetRoutes.GUIDE) {
             GuideRoute(
                 onPlayChannel = ::openChannel,
@@ -160,6 +165,7 @@ fun SunsetNavHost(
         composable(SunsetRoutes.MORE) {
             MoreScreen(
                 onOpenGuide = { navController.navigate(SunsetRoutes.GUIDE) },
+                onOpenPpv = { navController.navigateTopLevel(SunsetRoutes.PPV) },
                 onOpenSearch = { navController.navigate(SunsetRoutes.search()) },
                 onOpenMyList = { navController.navigate(SunsetRoutes.MY_LIST) },
                 onOpenSettings = { navController.navigate(SunsetRoutes.SETTINGS) },

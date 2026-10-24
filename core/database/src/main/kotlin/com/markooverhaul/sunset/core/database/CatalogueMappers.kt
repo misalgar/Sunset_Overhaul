@@ -14,6 +14,15 @@ private fun String?.splitGenres(): List<String> =
 
 private fun String?.clean(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
+private val QUALITY_SUFFIX = Regex(
+    """\s+(?:SUB|DUB|LAT|LATINO|CAST|ESP|ING|HD|FHD|UHD|4K)$""",
+    RegexOption.IGNORE_CASE,
+)
+
+/** Cleans titles stored by older catalogue versions without requiring a resync. */
+private fun String.cleanDisplayTitle(): String =
+    replace(QUALITY_SUFFIX, "").trim().ifBlank { this }
+
 /**
  * Domain mapping policy: provider identity and playback fields always win. TMDB supplies the
  * editorial fields (overview, cast, genres, runtime, certification) and fills missing artwork,
@@ -21,7 +30,7 @@ private fun String?.clean(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
  */
 fun CatalogueMovieEntity.toDomain(): Movie = Movie(
     id = id,
-    title = title,
+    title = title.cleanDisplayTitle(),
     year = year,
     plot = tmdbOverview.clean() ?: plot.clean(),
     posterUrl = posterUrl.clean() ?: tmdbPosterUrl.clean(),
@@ -40,7 +49,7 @@ fun CatalogueMovieEntity.toDomain(): Movie = Movie(
 
 fun CatalogueSeriesEntity.toSummary(): SeriesSummary = SeriesSummary(
     id = id,
-    title = title,
+    title = title.cleanDisplayTitle(),
     year = year,
     posterUrl = posterUrl.clean() ?: tmdbPosterUrl.clean(),
     backdropUrl = backdropUrl.clean() ?: tmdbBackdropUrl.clean(),
@@ -79,7 +88,7 @@ fun CatalogueEpisodeEntity.toDomain(): Episode = Episode(
     seriesId = seriesId,
     seasonNumber = seasonNumber,
     episodeNumber = episodeNumber,
-    title = title,
+    title = title.cleanDisplayTitle(),
     plot = tmdbOverview.clean() ?: plot.clean(),
     durationMinutes = tmdbRuntime ?: durationMinutes,
     stillUrl = stillUrl.clean() ?: tmdbStillUrl.clean(),

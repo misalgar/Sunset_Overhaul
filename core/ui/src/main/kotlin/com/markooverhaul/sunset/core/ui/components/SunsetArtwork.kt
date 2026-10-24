@@ -44,6 +44,7 @@ fun SunsetArtwork(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp),
+    monogramSize: androidx.compose.ui.unit.TextUnit = 40.sp,
 ) {
     val gradient = remember(title) { artworkGradient(title) }
     Box(
@@ -64,7 +65,7 @@ fun SunsetArtwork(
                 text = title.take(2).uppercase(),
                 color = SunsetColors.TextPrimary.copy(alpha = 0.72f),
                 fontWeight = FontWeight.Bold,
-                fontSize = 40.sp,
+                fontSize = monogramSize,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(8.dp),
             )

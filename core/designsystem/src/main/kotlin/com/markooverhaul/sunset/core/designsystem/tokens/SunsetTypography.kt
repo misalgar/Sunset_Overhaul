@@ -162,6 +162,13 @@ object SunsetDisplay {
         fontSize = 56.sp,
         lineHeight = 64.sp,
     )
+    /** Shorter TV billboards: two lines still fit above the meta row and CTAs. */
+    val HeroTvCompact = TextStyle(
+        fontFamily = InterFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 40.sp,
+        lineHeight = 48.sp,
+    )
     val Wordmark = TextStyle(
         fontFamily = InterFontFamily,
         fontWeight = FontWeight.Bold,

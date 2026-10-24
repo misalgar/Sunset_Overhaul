@@ -55,6 +55,12 @@ class TmdbApi @Inject constructor(
     suspend fun seasonDetail(seriesId: Long, season: Int): TmdbSeasonDetail? =
         get("tv/$seriesId/season/$season", emptyMap())
 
+    suspend fun movieRecommendations(id: Long): List<TmdbSearchItem> =
+        get<TmdbSearchResponse>("movie/$id/recommendations", emptyMap())?.results.orEmpty()
+
+    suspend fun seriesRecommendations(id: Long): List<TmdbSearchItem> =
+        get<TmdbSearchResponse>("tv/$id/recommendations", emptyMap())?.results.orEmpty()
+
     fun posterUrl(path: String?): String? = path?.takeIf { it.isNotBlank() }
         ?.let { "https://image.tmdb.org/t/p/w500$it" }
 
@@ -104,14 +110,21 @@ class TmdbApi @Inject constructor(
             .build()
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
+                if (!response.isSuccessful) {
+                    android.util.Log.w("SunsetTmdb", "GET ${path.trimStart('/')} -> ${response.code}")
+                    return@withContext null
+                }
                 val body = response.body?.string()?.takeIf { it.isNotBlank() }
                     ?: return@withContext null
-                runCatching { XtreamApi.json.decodeFromString<T>(body) }.getOrNull()
+                runCatching { XtreamApi.json.decodeFromString<T>(body) }
+                    .onFailure { android.util.Log.w("SunsetTmdb", "decode ${path.trimStart('/')} failed", it) }
+                    .getOrNull()
             }
-        } catch (_: IOException) {
+        } catch (error: IOException) {
+            android.util.Log.w("SunsetTmdb", "GET ${path.trimStart('/')} failed", error)
             null
-        } catch (_: IllegalArgumentException) {
+        } catch (error: IllegalArgumentException) {
+            android.util.Log.w("SunsetTmdb", "GET ${path.trimStart('/')} bad request", error)
             null
         }
     }

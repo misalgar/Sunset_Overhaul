@@ -181,7 +181,7 @@ fun LiveScreen(
                                 val span = (it.endUtcMs - it.startUtcMs).coerceAtLeast(1L)
                                 ((System.currentTimeMillis() - it.startUtcMs).toFloat() / span).coerceIn(0f, 1f)
                             },
-                            width = if (isTv) 300.dp else 250.dp,
+                            width = if (isTv) 240.dp else 220.dp,
                         )
                     }
                 }

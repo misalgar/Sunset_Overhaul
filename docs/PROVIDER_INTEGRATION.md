@@ -112,14 +112,21 @@ curated alias set and falls back to country-named categories. Channel names are 
 countries; the rest are “Other”. Unrecognised tokens such as `NCAA`, `TNT` and `CINE` are not
 treated as countries.
 
+**PPV.** The panel publishes PPV as a dated live category (`PAY PER VIEW 24/10/2026`). Sunset has a
+dedicated PPV destination and filters those categories/channels out of Live TV. Live categories and
+channels use a 15-minute cache; the PPV screen's Refresh action also drops the disk and in-memory
+caches, so the provider’s daily date change is picked up without waiting six hours.
+
 **TMDB.** Optional enrichment reads `tmdb.read.token` / `tmdb.api.key` from the gitignored
 `local.properties` into `BuildConfig`. Provider identity and playback fields always win; TMDB
 supplies overview, cast, genres, runtime, certification and fills missing posters/backdrops.
 Matching strips quality tags, compares localised and original titles, and requires a compatible
 year. Movie/series details enrich on open, episode stills cover the first three seasons, and a
 bounded backfill (60 movies + 40 series) runs after sync. Matches are cached for 30 days. Without a
-key the app runs on provider metadata only. The key is compiled into `BuildConfig` and is
-extractable from the APK; rotate it if it is ever abused.
+key the app runs on provider metadata only. “More like this” uses TMDB recommendations and resolves
+them against the local catalogue, so every rail card is playable; genre matching is the fallback.
+The key is compiled into `BuildConfig` and is extractable from the APK; rotate it if it is ever
+abused.
 
 **Known limits.** The first catalogue sync still parses the 16.6 MB JSON; later launches query Room
 and reach the hero in ~6 s. Some VOD files are HEVC/MKV and fail on older devices with "stream not

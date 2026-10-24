@@ -13,6 +13,13 @@
     <string name="action_clear">Clear</string>
     <string name="action_clear_all">Clear all</string>
     <string name="action_refresh">Refresh</string>
+    <string name="nav_ppv">PPV</string>
+    <string name="ppv_title">Pay Per View</string>
+    <string name="ppv_subtitle">Events published by your provider</string>
+    <string name="ppv_all_events">All events</string>
+    <string name="ppv_empty_title">No pay-per-view events</string>
+    <string name="ppv_empty_body">Events will appear here when the provider publishes them. Use Refresh after the daily update.</string>
+    <string name="ppv_unavailable">Pay per view unavailable</string>
     <string name="action_remove">Remove</string>
     <string name="action_undo">Undo</string>
     <string name="action_add_to_list">Add to My List</string>

@@ -29,6 +29,10 @@ class XtreamCache @Inject constructor(@ApplicationContext context: Context) {
         }
     }
 
+    fun remove(key: String) {
+        runCatching { File(directory, "$key.json").delete() }
+    }
+
     fun clear() {
         runCatching { directory.deleteRecursively() }
     }

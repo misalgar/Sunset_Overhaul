@@ -251,6 +251,29 @@ Verified on the Fire TV: cleaned channel names, country picker and US-only guide
 grid from Room, cold start to hero, and a TMDB-enriched movie detail with backdrop, runtime, genre
 and overview.
 
+### 5.11 Home, PPV destination and TMDB rails (2026-10-24)
+
+- Home billboard: TV height reduced to 280–320 dp and a 40 sp compact title style, so long titles
+  fit two lines instead of clipping above the billboard. Continue Watching and Live Now cards were
+  reduced from 300–360 dp to 220–240 dp and the landscape monogram is smaller.
+- Titles stored by older catalogue versions are cleaned at mapping time, so `SUB`/`DUB`/`4K`
+  suffixes disappear without a resync.
+- PPV is a first-class destination (`PPV` in the top navigation, More on phones), separate from
+  Live TV. Live categories/channels tagged `PAY PER VIEW` are filtered out of Live. The PPV screen
+  shows the provider’s dated category (`PAY PER VIEW 24/10/2026`), categories, events and now/next.
+- Live categories and channels now refresh every 15 minutes instead of six hours, and the PPV
+  screen has a Refresh action that drops both the disk and in-memory caches. This is what updates
+  the dated PPV label after the provider’s daily change.
+- “More like this” now uses TMDB recommendations: `movie/{id}/recommendations` and
+  `tv/{id}/recommendations`, resolved against the local Room catalogue by normalised
+  localised/original title and year. Only playable local titles are shown; genre matching remains
+  the fallback when TMDB has no recommendation. Title matching now ignores stop words and
+  punctuation (`Deadpool & Wolverine` = `Deadpool and Wolverine`), and the match cache is versioned
+  so old no-match rows are retried.
+
+Verified on the Fire TV: compact Home billboard, PPV screen with the 24/10/2026 label and events,
+PPV removed from Live, and a populated Deadpool “More like this” rail resolving to local titles.
+
 Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification

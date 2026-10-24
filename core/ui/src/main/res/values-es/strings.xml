@@ -12,6 +12,13 @@
     <string name="action_clear">Borrar</string>
     <string name="action_clear_all">Borrar todo</string>
     <string name="action_refresh">Actualizar</string>
+    <string name="nav_ppv">PPV</string>
+    <string name="ppv_title">Pago por evento</string>
+    <string name="ppv_subtitle">Eventos publicados por tu proveedor</string>
+    <string name="ppv_all_events">Todos los eventos</string>
+    <string name="ppv_empty_title">No hay eventos de pago por evento</string>
+    <string name="ppv_empty_body">Los eventos aparecerán aquí cuando el proveedor los publique. Usa Actualizar después de la actualización diaria.</string>
+    <string name="ppv_unavailable">Pago por evento no disponible</string>
     <string name="action_remove">Quitar</string>
     <string name="action_undo">Deshacer</string>
     <string name="action_add_to_list">Añadir a Mi lista</string>

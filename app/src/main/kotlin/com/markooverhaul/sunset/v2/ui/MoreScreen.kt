@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import com.markooverhaul.sunset.core.ui.components.SunsetSectionCard
 @Composable
 fun MoreScreen(
     onOpenGuide: () -> Unit,
+    onOpenPpv: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenMyList: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -70,6 +72,11 @@ fun MoreScreen(
                             icon = Icons.Rounded.DateRange,
                             title = stringResource(R.string.nav_guide),
                             onClick = onOpenGuide,
+                        )
+                        MoreRow(
+                            icon = Icons.Rounded.PlayArrow,
+                            title = stringResource(R.string.nav_ppv),
+                            onClick = onOpenPpv,
                         )
                         MoreRow(
                             icon = Icons.Rounded.Search,

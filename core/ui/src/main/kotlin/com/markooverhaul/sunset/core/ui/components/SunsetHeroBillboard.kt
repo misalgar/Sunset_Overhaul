@@ -57,8 +57,8 @@ fun SunsetHeroBillboard(
     val isTv = LocalIsTelevision.current
     // A short hero (small 720p/1080p TV viewports) drops lines instead of overflowing above the
     // billboard, which used to push the title under the top navigation bar.
-    val ultraCompact = isTv && height < 330.dp
-    val compact = isTv && height < 370.dp
+    val ultraCompact = isTv && height < 300.dp
+    val compact = isTv && height < 350.dp
     val titleLines = when {
         !isTv -> 2
         height >= 440.dp -> 3
@@ -70,6 +70,7 @@ fun SunsetHeroBillboard(
         compact -> 1
         else -> 2
     }
+    val titleStyle = if (compact) SunsetDisplay.HeroTvCompact else SunsetDisplay.HeroLarge
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -137,7 +138,7 @@ fun SunsetHeroBillboard(
             )
             Text(
                 text = title,
-                style = if (isTv) SunsetDisplay.HeroLarge else SunsetDisplay.HeroPhone,
+                style = if (isTv) titleStyle else SunsetDisplay.HeroPhone,
                 color = SunsetColors.TextPrimary,
                 maxLines = titleLines,
                 overflow = TextOverflow.Ellipsis,

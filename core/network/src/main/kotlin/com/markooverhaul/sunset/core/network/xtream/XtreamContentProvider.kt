@@ -81,7 +81,13 @@ class XtreamContentProvider @Inject constructor(
     private var categories: List<Category>? = null
 
     @Volatile
+    private var categoriesFetchedAt = 0L
+
+    @Volatile
     private var channels: List<LiveChannel>? = null
+
+    @Volatile
+    private var channelsFetchedAt = 0L
 
     @Volatile
     private var movieCategories: List<Category>? = null
@@ -137,26 +143,34 @@ class XtreamContentProvider @Inject constructor(
     }
 
     override suspend fun getLiveCategories(): List<Category> = mutex.withLock {
-        categories ?: run {
-            val body = cached("live_categories", "get_live_categories")
-            val mapped = XtreamApi.json
-                .decodeFromString<List<XtreamCategoryDto>>(body)
-                .mapIndexed { index, dto ->
-                    Category(
-                        id = dto.id,
-                        type = CategoryType.LIVE,
-                        name = dto.name,
-                        sortOrder = index,
-                    )
-                }
-                .filter { it.id.isNotBlank() && it.name.isNotBlank() }
-            categories = mapped
-            mapped
-        }
+        val fresh = categories != null &&
+            System.currentTimeMillis() - categoriesFetchedAt < LIVE_TTL_MS
+        if (fresh) return@withLock categories!!
+        val body = cached(
+            key = "live_categories",
+            action = "get_live_categories",
+            maxAgeMs = LIVE_TTL_MS,
+        )
+        val mapped = XtreamApi.json
+            .decodeFromString<List<XtreamCategoryDto>>(body)
+            .mapIndexed { index, dto ->
+                Category(
+                    id = dto.id,
+                    type = CategoryType.LIVE,
+                    name = dto.name,
+                    sortOrder = index,
+                )
+            }
+            .filter { it.id.isNotBlank() && it.name.isNotBlank() }
+        categories = mapped
+        categoriesFetchedAt = System.currentTimeMillis()
+        mapped
     }
 
     override suspend fun getLiveChannels(categoryId: String?): List<LiveChannel> = mutex.withLock {
-        val all = channels ?: loadChannels()
+        val fresh = channels != null &&
+            System.currentTimeMillis() - channelsFetchedAt < LIVE_TTL_MS
+        val all = if (fresh) channels!! else loadChannels()
         if (categoryId.isNullOrBlank()) all else all.filter { categoryId in it.categoryIds }
     }
 
@@ -169,6 +183,15 @@ class XtreamContentProvider @Inject constructor(
             guide ?: loadGuide().also { guide = it }
         }
         return all.filter { it.endUtcMs > from && it.startUtcMs < to }
+    }
+
+    override suspend fun refreshLive() = mutex.withLock {
+        categories = null
+        channels = null
+        categoriesFetchedAt = 0L
+        channelsFetchedAt = 0L
+        cache.remove("live_categories")
+        cache.remove("live_streams")
     }
 
     override suspend fun getMovieCategories(): List<Category> = categoryMutex.withLock {
@@ -254,6 +277,20 @@ class XtreamContentProvider @Inject constructor(
         return catalogueDao.episodes(seriesId, season).map { it.toDomain() }
     }
 
+    override suspend fun getMovieRecommendations(id: String): List<Movie> {
+        ensureCatalogue()
+        var entity = catalogueDao.movie(id) ?: return emptyList()
+        entity = enrichMovie(entity)
+        return tmdb.movieRecommendations(entity).map { it.toDomain() }
+    }
+
+    override suspend fun getSeriesRecommendations(id: String): List<SeriesSummary> {
+        ensureCatalogue()
+        var entity = catalogueDao.series(id) ?: return emptyList()
+        entity = enrichSeries(entity)
+        return tmdb.seriesRecommendations(entity).map { it.toSummary() }
+    }
+
     override suspend fun search(query: String): SearchResults {
         val term = query.trim()
         if (term.length < MIN_QUERY) return SearchResults()
@@ -303,10 +340,12 @@ class XtreamContentProvider @Inject constructor(
     }
 
     private suspend fun loadChannels(): List<LiveChannel> {
-        val body = cached("live_streams", "get_live_streams")
+        val body = cached("live_streams", "get_live_streams", maxAgeMs = LIVE_TTL_MS)
         val categoryNames = runCatching {
             XtreamApi.json
-                .decodeFromString<List<XtreamCategoryDto>>(cached("live_categories", "get_live_categories"))
+                .decodeFromString<List<XtreamCategoryDto>>(
+                    cached("live_categories", "get_live_categories", maxAgeMs = LIVE_TTL_MS),
+                )
                 .associate { it.id to it.name }
         }.getOrDefault(emptyMap())
         val mapped = XtreamApi.json
@@ -331,6 +370,7 @@ class XtreamContentProvider @Inject constructor(
                 )
             }
         channels = mapped
+        channelsFetchedAt = System.currentTimeMillis()
         return mapped
     }
 
@@ -624,9 +664,13 @@ class XtreamContentProvider @Inject constructor(
     private fun formatOf(extension: String): StreamFormat =
         if (extension.equals("m3u8", ignoreCase = true)) StreamFormat.HLS else StreamFormat.MP4
 
-    private suspend fun cached(key: String, action: String): String {
+    private suspend fun cached(
+        key: String,
+        action: String,
+        maxAgeMs: Long = XtreamCache.DEFAULT_TTL_MS,
+    ): String {
         val credentials = credentials ?: throw ProviderError.ServiceNotConfigured
-        cache.read(key)?.let { return it }
+        cache.read(key, maxAgeMs)?.let { return it }
         val body = api.call(credentials.baseUrl, credentials.username, credentials.password, action)
         cache.write(key, body)
         return body
@@ -678,6 +722,7 @@ class XtreamContentProvider @Inject constructor(
         const val ACCOUNT_KEY = "account"
         const val GUIDE_KEY = "xmltv"
         const val CATALOGUE_TTL_MS = 6 * 60 * 60 * 1000L
+        const val LIVE_TTL_MS = 15 * 60 * 1000L
         const val HOUR_MS = 60 * 60 * 1000L
         const val DAY_MS = 24 * HOUR_MS
         val TITLE_YEAR = Regex("""\((\d{4})\)""")

@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.markooverhaul.sunset.core.designsystem.components.LockBadge
 import com.markooverhaul.sunset.core.designsystem.components.StatusBadge
 import com.markooverhaul.sunset.core.designsystem.components.SunsetProgressBar
@@ -162,6 +163,7 @@ fun SunsetLandscapeCard(
                 imageUrl = imageUrl,
                 shape = shape,
                 contentDescription = title,
+                monogramSize = 28.sp,
                 modifier = Modifier.matchParentSize(),
             )
             if (progress != null && progress > 0f) {

@@ -106,11 +106,10 @@ fun HomeScreen(
         } else {
             148.dp
         }
-        // Keep the hero cinematic but leave room for the first rail on short TV viewports.
-        // The hero content (two-line display title, meta, CTAs) needs ~300 dp; anything shorter
-        // clips the title at the top of the billboard.
+        // Keep the hero cinematic but leave room for the first rail on short TV viewports. The
+        // compact billboard style fits two title lines in this height.
         val heroHeight = if (isTv) {
-            (maxHeight * 0.52f).coerceIn(320.dp, 380.dp)
+            (maxHeight * 0.50f).coerceIn(280.dp, 320.dp)
         } else {
             400.dp
         }
@@ -193,7 +192,7 @@ fun HomeScreen(
                                 onClick = { onResume(progress) },
                                 eyebrow = contentTypeLabel(progress.contentType),
                                 progress = progress.fraction,
-                                width = if (isTv) 360.dp else 280.dp,
+                                width = if (isTv) 240.dp else 200.dp,
                             )
                         }
                     }
@@ -222,7 +221,7 @@ fun HomeScreen(
                                     ((System.currentTimeMillis() - programme.startUtcMs).toFloat() / span)
                                         .coerceIn(0f, 1f)
                                 },
-                                width = if (isTv) 300.dp else 250.dp,
+                                width = if (isTv) 240.dp else 220.dp,
                             )
                         }
                     }

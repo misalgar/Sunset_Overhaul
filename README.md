@@ -27,6 +27,8 @@ stream URL is stored in the repository; release builds still bind the fail-close
 | Room-backed VOD/series catalogue with indexed paging | Complete |
 | Country-aware channel names and guide country filter | Complete |
 | Optional TMDB enrichment (details, artwork, episode stills) | Complete; requires a key in `local.properties` |
+| Dedicated PPV destination with a 15-minute live schedule refresh | Complete |
+| TMDB “More like this” rails resolved to playable local titles | Complete |
 
 Builds, lint and JVM tests were verified on 2026-10-23; see [Verification](#verification) and
 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for exact commands and results. Manual
