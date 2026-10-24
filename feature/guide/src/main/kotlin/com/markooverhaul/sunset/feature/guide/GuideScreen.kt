@@ -1,7 +1,6 @@
 package com.markooverhaul.sunset.feature.guide
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,11 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,9 +38,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -51,11 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.markooverhaul.sunset.core.designsystem.components.CategoryChip
 import com.markooverhaul.sunset.core.designsystem.components.SunsetEmptyState
 import com.markooverhaul.sunset.core.designsystem.components.SunsetErrorState
 import com.markooverhaul.sunset.core.designsystem.components.SunsetFocusable
-import com.markooverhaul.sunset.core.designsystem.components.SunsetPrimaryButton
 import com.markooverhaul.sunset.core.designsystem.components.SunsetSkeleton
 import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
@@ -119,16 +122,26 @@ fun GuideScreen(
     val isTv = LocalIsTelevision.current
     val context = LocalContext.current
     val density = LocalDensity.current
-    val gutter = if (isTv) SunsetSpacing.Xxxl else SunsetSpacing.Lg
-    val channelColumn = if (isTv) 224.dp else 132.dp
-    val slotWidth = if (isTv) 156.dp else 116.dp
-    val rowHeight = if (isTv) 60.dp else 64.dp
+    val gutter = if (isTv) SunsetSpacing.Xxl else SunsetSpacing.Lg
+    val channelColumn = if (isTv) 208.dp else 124.dp
+    val slotWidth = if (isTv) 150.dp else 112.dp
+    val rowHeight = if (isTv) 52.dp else 56.dp
     val dayWidth = slotWidth * SLOT_COUNT.toFloat()
     val minuteWidth = slotWidth / SLOT_MINUTES.toFloat()
 
     val dayStart = GuideViewModel.startOfDay(state.selectedDay)
     val dayEnd = dayStart + DAY_MS
     val horizontalState = rememberScrollState()
+    val todayFocus = remember { FocusRequester() }
+    val tomorrowFocus = remember { FocusRequester() }
+    val favouritesFocus = remember { FocusRequester() }
+    val gridFocus = remember { FocusRequester() }
+    val watchFocus = remember { FocusRequester() }
+    val activeTabFocus = when {
+        state.favouritesOnly -> favouritesFocus
+        state.selectedDay == 0 -> todayFocus
+        else -> tomorrowFocus
+    }
 
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -157,12 +170,12 @@ fun GuideScreen(
     LaunchedEffect(dayStart, state.favouritesOnly) { selection = null }
     val preview = selection ?: fallbackSelection
 
-    // Start the grid two slots before now, where the viewer expects the current hour to be.
+    // Start the grid two slots before now, snapped to a slot boundary so the first ruler label is
+    // never half-clipped.
     LaunchedEffect(dayStart, density, slotWidth) {
-        val minutes = ((now - dayStart).toFloat() / MINUTE_MS) - SLOT_MINUTES
-        val offset = with(density) {
-            (minuteWidth * minutes.coerceAtLeast(0f)).roundToPx()
-        }
+        val rawMinutes = ((now - dayStart) / MINUTE_MS).toInt() - SLOT_MINUTES
+        val minutes = ((rawMinutes / SLOT_MINUTES) * SLOT_MINUTES).coerceAtLeast(0)
+        val offset = with(density) { (minuteWidth * minutes.toFloat()).roundToPx() }
         horizontalState.scrollTo(offset)
     }
 
@@ -184,6 +197,8 @@ fun GuideScreen(
                 now = now,
                 gutter = gutter,
                 isTv = isTv,
+                watchFocus = watchFocus,
+                tabFocus = activeTabFocus,
                 onWatch = { preview?.let { onPlayChannel(it.channel) } },
             )
         }
@@ -193,6 +208,11 @@ fun GuideScreen(
             gutter = gutter,
             onSelectDay = onSelectDay,
             onToggleFavouritesOnly = onToggleFavouritesOnly,
+            todayFocus = todayFocus,
+            tomorrowFocus = tomorrowFocus,
+            favouritesFocus = favouritesFocus,
+            watchFocus = watchFocus,
+            gridFocus = gridFocus,
         )
 
         when {
@@ -242,10 +262,12 @@ fun GuideScreen(
                             dayWidth = dayWidth,
                             channelColumn = channelColumn,
                             rowHeight = rowHeight,
-                            slotWidth = slotWidth,
                             gutter = gutter,
                             striped = index % 2 == 0,
                             scrollState = horizontalState,
+                            firstRow = index == 0,
+                            gridFocus = gridFocus,
+                            tabFocus = activeTabFocus,
                             onFocusProgramme = { programme ->
                                 selection = GuideSelection(channel, programme)
                             },
@@ -324,26 +346,29 @@ private fun GuidePreview(
     now: Long,
     gutter: Dp,
     isTv: Boolean,
+    watchFocus: FocusRequester,
+    tabFocus: FocusRequester,
     onWatch: () -> Unit,
 ) {
     val context = LocalContext.current
-    val shape = RoundedCornerShape(SunsetRadius.Lg)
-    val height = if (isTv) 132.dp else 134.dp
+    val height = if (isTv) 128.dp else 138.dp
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = gutter)
             .height(height)
-            .clip(shape)
             .background(
                 Brush.horizontalGradient(
-                    listOf(SunsetColors.BgSurface3, SunsetColors.BgSurface),
+                    listOf(
+                        SunsetColors.BgSurface3,
+                        SunsetColors.BgSurface,
+                        SunsetColors.BgBase,
+                    ),
                 ),
-            )
-            .border(1.dp, SunsetColors.BorderSubtle, shape),
+            ),
     ) {
-        val showArtwork = maxWidth >= 560.dp
+        val showArtwork = maxWidth >= 520.dp
         if (selection == null) {
             Text(
                 text = stringResource(R.string.guide_select_programme),
@@ -377,13 +402,13 @@ private fun GuidePreview(
                 .fillMaxSize()
                 .padding(horizontal = SunsetSpacing.Lg, vertical = SunsetSpacing.Sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Lg),
+            horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
         ) {
             ChannelLogo(
                 name = channel.name,
                 logoUrl = channel.logoUrl,
-                modifier = Modifier.size(if (isTv) 72.dp else 56.dp),
-                size = if (isTv) 60.dp else 44.dp,
+                modifier = Modifier.size(if (isTv) 64.dp else 52.dp),
+                size = if (isTv) 54.dp else 42.dp,
             )
 
             Column(
@@ -420,11 +445,11 @@ private fun GuidePreview(
                         maxLines = 1,
                         modifier = Modifier.weight(1f),
                     )
-                    // On TV this button is also the guaranteed focus anchor when the guide opens;
-                    // Down moves into the first channel row.
-                    SunsetPrimaryButton(
+                    GuideAction(
                         text = stringResource(R.string.guide_watch_channel),
                         onClick = onWatch,
+                        focusRequester = watchFocus,
+                        downFocus = tabFocus,
                     )
                 }
                 programme.description?.takeIf { it.isNotBlank() }?.let { description ->
@@ -443,7 +468,7 @@ private fun GuidePreview(
                     programme = programme,
                     channel = channel,
                     modifier = Modifier
-                        .widthIn(max = if (isTv) 196.dp else 160.dp)
+                        .widthIn(max = if (isTv) 176.dp else 150.dp)
                         .aspectRatio(16f / 9f),
                 )
             }
@@ -462,7 +487,7 @@ private fun GuidePreviewArtwork(
     val gradient = remember(programme.title) { artworkGradient(programme.title) }
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(SunsetRadius.Md))
+            .clip(RoundedCornerShape(SunsetRadius.Sm))
             .background(gradient),
         contentAlignment = Alignment.Center,
     ) {
@@ -495,31 +520,167 @@ private fun GuideFilterRow(
     gutter: Dp,
     onSelectDay: (Int) -> Unit,
     onToggleFavouritesOnly: () -> Unit,
+    todayFocus: FocusRequester,
+    tomorrowFocus: FocusRequester,
+    favouritesFocus: FocusRequester,
+    watchFocus: FocusRequester,
+    gridFocus: FocusRequester,
 ) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Sm),
-        contentPadding = PaddingValues(horizontal = gutter, vertical = SunsetSpacing.Sm),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = gutter, vertical = SunsetSpacing.Xs),
+        horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Xl),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        item(key = "today") {
-            CategoryChip(
-                text = stringResource(R.string.guide_today),
-                selected = state.selectedDay == 0,
-                onClick = { onSelectDay(0) },
+        GuideTab(
+            text = stringResource(R.string.guide_today),
+            selected = state.selectedDay == 0,
+            onClick = { onSelectDay(0) },
+            focusRequester = todayFocus,
+            upFocus = watchFocus,
+            downFocus = gridFocus,
+        )
+        GuideTab(
+            text = stringResource(R.string.guide_tomorrow),
+            selected = state.selectedDay == 1,
+            onClick = { onSelectDay(1) },
+            focusRequester = tomorrowFocus,
+            upFocus = watchFocus,
+            downFocus = gridFocus,
+        )
+        GuideTab(
+            text = stringResource(R.string.guide_favourites),
+            selected = state.favouritesOnly,
+            onClick = onToggleFavouritesOnly,
+            focusRequester = favouritesFocus,
+            upFocus = watchFocus,
+            downFocus = gridFocus,
+        )
+    }
+}
+
+/** Text-style filter tab: no pill, amber text and a 2 dp underline when selected or focused. */
+@Composable
+private fun GuideTab(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester?,
+    upFocus: FocusRequester,
+    downFocus: FocusRequester,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val requesterModifier = if (focusRequester != null) {
+        Modifier.focusRequester(focusRequester)
+    } else {
+        Modifier
+    }
+    SunsetFocusable(
+        onClick = onClick,
+        modifier = Modifier
+            .height(44.dp)
+            .then(requesterModifier)
+            .focusProperties {
+                up = upFocus
+                down = downFocus
+            },
+        shape = RectangleShape,
+        scaleOnFocus = false,
+        drawFocusRing = false,
+        onFocusChanged = { focused = it },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .background(
+                    if (focused) SunsetColors.AccentPrimary.copy(alpha = 0.10f) else Color.Transparent,
+                )
+                .padding(horizontal = SunsetSpacing.Xs),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleSmall,
+                color = when {
+                    focused -> SunsetColors.AccentHover
+                    selected -> SunsetColors.AccentPrimary
+                    else -> SunsetColors.TextSecondary
+                },
+                modifier = Modifier.drawBehind {
+                    if (selected) {
+                        val y = size.height + 3.dp.toPx()
+                        drawLine(
+                            color = SunsetColors.AccentPrimary,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 2.dp.toPx(),
+                        )
+                    }
+                },
             )
         }
-        item(key = "tomorrow") {
-            CategoryChip(
-                text = stringResource(R.string.guide_tomorrow),
-                selected = state.selectedDay == 1,
-                onClick = { onSelectDay(1) },
-            )
-        }
-        item(key = "favourites") {
-            CategoryChip(
-                text = stringResource(R.string.guide_favourites),
-                selected = state.favouritesOnly,
-                onClick = onToggleFavouritesOnly,
-            )
+    }
+}
+
+/** Borderless text action used by the preview: icon + label, underline on focus. */
+@Composable
+private fun GuideAction(
+    text: String,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester,
+    downFocus: FocusRequester,
+) {
+    var focused by remember { mutableStateOf(false) }
+    SunsetFocusable(
+        onClick = onClick,
+        modifier = Modifier
+            .height(40.dp)
+            .focusRequester(focusRequester)
+            .focusProperties { down = downFocus },
+        shape = RectangleShape,
+        scaleOnFocus = false,
+        drawFocusRing = false,
+        onFocusChanged = { focused = it },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .background(
+                    if (focused) SunsetColors.AccentPrimary.copy(alpha = 0.10f) else Color.Transparent,
+                )
+                .padding(horizontal = SunsetSpacing.Sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier.drawBehind {
+                    if (focused) {
+                        val y = size.height + 3.dp.toPx()
+                        drawLine(
+                            color = SunsetColors.AccentPrimary,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 2.dp.toPx(),
+                        )
+                    }
+                },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    tint = if (focused) SunsetColors.AccentHover else SunsetColors.AccentPrimary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (focused) SunsetColors.AccentHover else SunsetColors.AccentPrimary,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
@@ -538,18 +699,19 @@ private fun GuideRuler(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = gutter)
-            .height(30.dp),
+            .height(30.dp)
+            .drawBehind {
+                drawLine(
+                    color = SunsetColors.BorderSubtle.copy(alpha = 0.6f),
+                    start = Offset(0f, size.height),
+                    end = Offset(size.width, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+            .padding(horizontal = gutter),
         verticalAlignment = Alignment.Bottom,
     ) {
-        Text(
-            text = stringResource(R.string.guide_channel_column).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = SunsetColors.TextTertiary,
-            modifier = Modifier
-                .width(channelColumn)
-                .padding(start = SunsetSpacing.Xs, bottom = SunsetSpacing.Xs),
-        )
+        Spacer(modifier = Modifier.width(channelColumn))
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -565,21 +727,20 @@ private fun GuideRuler(
                         val slotPx = slotWidth.toPx()
                         val nowX = (((now - dayStart).toFloat() / MINUTE_MS) *
                             (slotPx / SLOT_MINUTES.toFloat()))
-                        for (slot in 0..SLOT_COUNT) {
-                            drawLine(
-                                color = SunsetColors.BorderSubtle.copy(alpha = 0.5f),
-                                start = Offset(slot * slotPx, 0f),
-                                end = Offset(slot * slotPx, size.height),
-                                strokeWidth = 1.dp.toPx(),
-                            )
-                        }
                         if (nowX in 0f..size.width) {
                             drawLine(
                                 color = SunsetColors.SemanticLive,
                                 start = Offset(nowX, 0f),
                                 end = Offset(nowX, size.height),
-                                strokeWidth = 2.dp.toPx(),
+                                strokeWidth = 1.5.dp.toPx(),
                             )
+                            val marker = Path().apply {
+                                moveTo(nowX - 5.dp.toPx(), size.height)
+                                lineTo(nowX + 5.dp.toPx(), size.height)
+                                lineTo(nowX, size.height - 6.dp.toPx())
+                                close()
+                            }
+                            drawPath(marker, SunsetColors.SemanticLive)
                         }
                     },
             ) {
@@ -588,7 +749,7 @@ private fun GuideRuler(
                         Text(
                             text = SunsetFormat.time(context, dayStart + slot * SLOT_MINUTES * MINUTE_MS),
                             style = MaterialTheme.typography.labelMedium,
-                            color = SunsetColors.TextTertiary,
+                            color = SunsetColors.TextSecondary,
                             modifier = Modifier
                                 .width(slotWidth)
                                 .padding(start = SunsetSpacing.Sm, bottom = SunsetSpacing.Xs),
@@ -611,23 +772,34 @@ private fun GuideChannelRow(
     dayWidth: Dp,
     channelColumn: Dp,
     rowHeight: Dp,
-    slotWidth: Dp,
     gutter: Dp,
     striped: Boolean,
     scrollState: androidx.compose.foundation.ScrollState,
+    firstRow: Boolean,
+    gridFocus: FocusRequester,
+    tabFocus: FocusRequester,
     onFocusProgramme: (EpgProgramme) -> Unit,
     onPlayChannel: (LiveChannel) -> Unit,
 ) {
     val rowBackground = if (striped) {
-        SunsetColors.BgSurface.copy(alpha = 0.55f)
+        SunsetColors.BgSurface.copy(alpha = 0.30f)
     } else {
-        SunsetColors.BgBase
+        Color.Transparent
     }
+    var channelFocused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(rowHeight)
             .background(rowBackground)
+            .drawBehind {
+                drawLine(
+                    color = SunsetColors.BorderSubtle.copy(alpha = 0.45f),
+                    start = Offset(0f, size.height),
+                    end = Offset(size.width, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
             .padding(horizontal = gutter),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -635,36 +807,60 @@ private fun GuideChannelRow(
             onClick = { onPlayChannel(channel) },
             modifier = Modifier
                 .width(channelColumn)
-                .fillMaxHeight(),
-            shape = RoundedCornerShape(SunsetRadius.Sm),
+                .fillMaxHeight()
+                .then(
+                    if (firstRow) {
+                        Modifier
+                            .focusRequester(gridFocus)
+                            .focusProperties { up = tabFocus }
+                    } else {
+                        Modifier
+                    },
+                ),
+            shape = RectangleShape,
             scaleOnFocus = false,
+            drawFocusRing = false,
+            onFocusChanged = { channelFocused = it },
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(
+                        if (channelFocused) {
+                            SunsetColors.AccentPrimary.copy(alpha = 0.16f)
+                        } else {
+                            Color.Transparent
+                        },
+                    )
                     .drawBehind {
+                        if (channelFocused) {
+                            drawRect(
+                                color = SunsetColors.AccentPrimary,
+                                size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height),
+                            )
+                        }
                         drawLine(
-                            color = SunsetColors.BorderSubtle.copy(alpha = 0.7f),
+                            color = SunsetColors.BorderSubtle.copy(alpha = 0.6f),
                             start = Offset(size.width, 0f),
                             end = Offset(size.width, size.height),
                             strokeWidth = 1.dp.toPx(),
                         )
                     }
-                    .padding(start = SunsetSpacing.Xs, end = SunsetSpacing.Sm),
+                    .padding(start = SunsetSpacing.Sm, end = SunsetSpacing.Sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Sm),
             ) {
                 Text(
                     text = channel.number.toString(),
                     style = MaterialTheme.typography.labelMedium,
-                    color = SunsetColors.TextTertiary,
-                    modifier = Modifier.widthIn(min = 22.dp),
+                    color = if (channelFocused) SunsetColors.AccentPrimary else SunsetColors.TextTertiary,
+                    modifier = Modifier.widthIn(min = 20.dp),
                 )
                 ChannelLogo(
                     name = channel.name,
                     logoUrl = channel.logoUrl,
-                    modifier = Modifier.size(38.dp),
-                    size = 30.dp,
+                    modifier = Modifier.size(34.dp),
+                    size = 28.dp,
                 )
                 Column(
                     modifier = Modifier.weight(1f),
@@ -699,28 +895,7 @@ private fun GuideChannelRow(
             Box(
                 modifier = Modifier
                     .width(dayWidth)
-                    .fillMaxHeight()
-                    .drawBehind {
-                        val slotPx = slotWidth.toPx()
-                        for (slot in 0..SLOT_COUNT) {
-                            drawLine(
-                                color = SunsetColors.BorderSubtle.copy(alpha = 0.5f),
-                                start = Offset(slot * slotPx, 0f),
-                                end = Offset(slot * slotPx, size.height),
-                                strokeWidth = 1.dp.toPx(),
-                            )
-                        }
-                        val nowX = (((now - dayStart).toFloat() / MINUTE_MS) *
-                            (slotPx / SLOT_MINUTES.toFloat()))
-                        if (nowX in 0f..size.width) {
-                            drawLine(
-                                color = SunsetColors.SemanticLive.copy(alpha = 0.8f),
-                                start = Offset(nowX, 0f),
-                                end = Offset(nowX, size.height),
-                                strokeWidth = 2.dp.toPx(),
-                            )
-                        }
-                    },
+                    .fillMaxHeight(),
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     var cursorMinutes = 0f
@@ -763,38 +938,80 @@ private fun GuideProgrammeBlock(
 ) {
     val context = LocalContext.current
     val isNow = now >= programme.startUtcMs && now < programme.endUtcMs
-    val shape = RoundedCornerShape(SunsetRadius.Sm)
-    val background = if (isNow) {
-        SunsetColors.BgSurface3
-    } else {
-        SunsetColors.BgSurface2
-    }
+    var focused by remember { mutableStateOf(false) }
     val progress = if (isNow) {
         ((now - programme.startUtcMs).toFloat() /
             (programme.endUtcMs - programme.startUtcMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
     } else {
         0f
     }
+    val cellBackground = when {
+        focused -> SunsetColors.AccentPrimary
+        isNow -> SunsetColors.AccentPrimary.copy(alpha = 0.07f)
+        else -> Color.Transparent
+    }
+    val titleColor = when {
+        focused -> SunsetColors.AccentOn
+        isNow -> SunsetColors.AccentPrimary
+        else -> SunsetColors.TextPrimary
+    }
+    val timeColor = when {
+        focused -> SunsetColors.AccentOn.copy(alpha = 0.72f)
+        isNow -> SunsetColors.AccentPrimary.copy(alpha = 0.78f)
+        else -> SunsetColors.TextTertiary
+    }
 
     Box(
         modifier = Modifier
             .width(width)
-            .height(rowHeight)
-            .padding(vertical = 3.dp, horizontal = 1.dp),
+            .fillMaxHeight()
+            .drawBehind {
+                // Programme boundaries are the only vertical lines in the grid; there are no
+                // per-block cards, so the schedule reads as one continuous surface.
+                drawLine(
+                    color = SunsetColors.BorderSubtle.copy(alpha = 0.38f),
+                    start = Offset(0f, 0f),
+                    end = Offset(0f, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            },
     ) {
         SunsetFocusable(
             onClick = onClick,
-            modifier = Modifier
-                .fillMaxSize()
-                .onFocusChanged { if (it.isFocused) onFocus() },
-            shape = shape,
+            modifier = Modifier.fillMaxSize(),
+            shape = RectangleShape,
             scaleOnFocus = false,
+            drawFocusRing = false,
+            onFocusChanged = {
+                focused = it
+                if (it) onFocus()
+            },
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(background)
-                    .padding(horizontal = SunsetSpacing.Sm, vertical = SunsetSpacing.Xs),
+                    .drawBehind {
+                        if (cellBackground != Color.Transparent) {
+                            drawRect(color = cellBackground)
+                        }
+                        if (isNow) {
+                            val x = ((now - programme.startUtcMs).toFloat() /
+                                (programme.endUtcMs - programme.startUtcMs)
+                                    .coerceAtLeast(1L))
+                                .coerceIn(0f, 1f) * size.width
+                            drawLine(
+                                color = if (focused) {
+                                    SunsetColors.AccentOn.copy(alpha = 0.55f)
+                                } else {
+                                    SunsetColors.SemanticLive
+                                },
+                                start = Offset(x, 0f),
+                                end = Offset(x, size.height),
+                                strokeWidth = 1.5.dp.toPx(),
+                            )
+                        }
+                    }
+                    .padding(horizontal = 10.dp, vertical = 3.dp),
             ) {
                 Column(
                     modifier = Modifier.fillMaxHeight(),
@@ -803,11 +1020,11 @@ private fun GuideProgrammeBlock(
                     Text(
                         text = programme.title,
                         style = MaterialTheme.typography.titleSmall,
-                        color = if (isNow) SunsetColors.AccentPrimary else SunsetColors.TextPrimary,
+                        color = titleColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (width >= 110.dp) {
+                    if (width >= 112.dp) {
                         Text(
                             text = SunsetFormat.timeRange(
                                 context,
@@ -815,7 +1032,7 @@ private fun GuideProgrammeBlock(
                                 programme.endUtcMs,
                             ),
                             style = MaterialTheme.typography.labelSmall,
-                            color = SunsetColors.TextTertiary,
+                            color = timeColor,
                             maxLines = 1,
                         )
                     }
@@ -826,13 +1043,21 @@ private fun GuideProgrammeBlock(
                             .align(Alignment.BottomStart)
                             .fillMaxWidth()
                             .height(2.dp)
-                            .background(SunsetColors.BgSurface3),
+                            .background(
+                                if (focused) {
+                                    SunsetColors.AccentOn.copy(alpha = 0.25f)
+                                } else {
+                                    SunsetColors.BorderSubtle
+                                },
+                            ),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(progress)
                                 .fillMaxHeight()
-                                .background(SunsetColors.SemanticLive),
+                                .background(
+                                    if (focused) SunsetColors.AccentOn else SunsetColors.SemanticLive,
+                                ),
                         )
                     }
                 }

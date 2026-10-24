@@ -201,6 +201,29 @@ Verified on the Fire TV: grid alignment, ruler sync, now marker, D-pad left/righ
 timeline, up/down across channels, preview updates, programme/channel playback, Tomorrow view and
 the no-guide state.
 
+### 5.9 Flat guide visual pass (2026-10-24)
+
+Replaced the card grid with a continuous schedule surface:
+
+- Programme cells are no longer enclosed: no per-block background, rounded corners or borders.
+  Text sits directly on the channel row; only focused/current cells carry a fill.
+- Focus is edge-to-edge: the whole programme cell fills with `AccentPrimary` and switches to
+  `AccentOn` text. Channel cells use a translucent amber fill plus a 3 dp left bar. The regular
+  `sunsetFocusRing` is bypassed via the new `drawFocusRing` flag on `SunsetFocusable`.
+- Separation comes from 1 dp horizontal row dividers, alternating row shading and 1 dp programme
+  boundaries. The old 30-minute vertical grid lines were removed.
+- The preview is a borderless gradient band; Today/Tomorrow/Favourites are text tabs with a 2 dp
+  underline on the selected tab and a borderless amber wash on focus. "Watch channel" is a text
+  action with a play glyph and an underline on focus.
+- Rows are 52 dp, the outer gutter 32 dp, and programme cells have no gaps. The initial scroll is
+  snapped to a 30-minute boundary so the first ruler label is fully visible.
+- The now line sits behind programme text; the ruler carries a red now line and triangle marker.
+- TV focus is wired explicitly: grid → active day tab → preview action → grid, so the filters are
+  reachable on a remote and Up from the grid returns to the active tab.
+
+Verified on the Fire TV: flat rows and dividers, solid amber cell focus, channel focus wash, tab
+focus loop, Tomorrow switch with the active tab retained, and channel playback.
+
 Next: catalogue cold-start (Room), release binding, phone/tablet pass.
 
 ## 6. Verification

@@ -120,8 +120,9 @@ fun Modifier.sunsetFocusScale(focused: Boolean): Modifier {
 }
 
 /**
- * Clickable surface with a focus ring. [clickable] supplies the focus target and D-pad activation;
- * we do not add a second `focusable()` modifier, which would create duplicate focus stops.
+ * Clickable surface with an optional focus ring. [clickable] supplies the focus target and D-pad
+ * activation; we do not add a second `focusable()` modifier, which would create duplicate focus
+ * stops. Set [drawFocusRing] to false for surfaces that draw their own edge-to-edge focus state.
  */
 @Composable
 fun SunsetFocusable(
@@ -129,17 +130,23 @@ fun SunsetFocusable(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(SunsetRadius.Md),
     scaleOnFocus: Boolean = true,
+    drawFocusRing: Boolean = true,
+    onFocusChanged: (Boolean) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val focusModifier = if (scaleOnFocus) Modifier.sunsetFocusScale(focused) else Modifier
+    val ringModifier = if (drawFocusRing) Modifier.sunsetFocusRing(focused, shape) else Modifier
     Box(
         modifier = modifier
             .then(focusModifier)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                focused = it.isFocused
+                onFocusChanged(it.isFocused)
+            }
             .clip(shape)
-            .sunsetFocusRing(focused, shape)
+            .then(ringModifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
