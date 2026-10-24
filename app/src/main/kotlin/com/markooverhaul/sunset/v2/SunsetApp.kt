@@ -5,6 +5,7 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -14,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markooverhaul.sunset.core.data.repository.ReduceMotionSetting
 import com.markooverhaul.sunset.core.designsystem.theme.SunsetTheme
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
+import com.markooverhaul.sunset.core.ui.components.LocalDemoMode
 import com.markooverhaul.sunset.feature.account.LoginRoute
 import com.markooverhaul.sunset.v2.ui.MainShell
 import com.markooverhaul.sunset.v2.ui.ServiceNotConfiguredScreen
@@ -49,7 +51,12 @@ fun SunsetApp(
                     demoMode = BuildConfig.DEBUG,
                 )
 
-                StartupState.Ready -> MainShell(demoMode = BuildConfig.DEBUG)
+                // The demo banner must follow the actual session: a live panel is not demo data.
+                StartupState.Ready -> CompositionLocalProvider(
+                    LocalDemoMode provides (state.session?.isDemo == true),
+                ) {
+                    MainShell(demoMode = state.session?.isDemo == true)
+                }
             }
         }
     }

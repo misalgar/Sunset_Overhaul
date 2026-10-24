@@ -17,12 +17,16 @@ data class LoginUiState(
     val password: String = "",
     val rememberMe: Boolean = true,
     val passwordVisible: Boolean = false,
+    val serverUrl: String = "",
     val isSubmitting: Boolean = false,
     val error: Throwable? = null,
     val signedIn: Boolean = false,
 ) {
     val canSubmit: Boolean
-        get() = username.isNotBlank() && password.isNotBlank() && !isSubmitting
+        get() = serverUrl.isNotBlank() &&
+            username.isNotBlank() &&
+            password.isNotBlank() &&
+            !isSubmitting
 
     val serviceNotConfigured: Boolean
         get() = error is ProviderError.ServiceNotConfigured
@@ -43,6 +47,16 @@ class LoginViewModel @Inject constructor(
                 _state.update { it.copy(username = remembered, rememberMe = true) }
             }
         }
+        viewModelScope.launch {
+            val server = authRepository.lastServerUrl.firstOrNull()
+            if (!server.isNullOrBlank()) {
+                _state.update { it.copy(serverUrl = server) }
+            }
+        }
+    }
+
+    fun onServerChange(value: String) {
+        _state.update { it.copy(serverUrl = value, error = null) }
     }
 
     fun onUsernameChange(value: String) {
@@ -64,7 +78,7 @@ class LoginViewModel @Inject constructor(
     fun submit() {
         val current = _state.value
         if (current.isSubmitting) return
-        if (current.username.isBlank() || current.password.isBlank()) {
+        if (!current.canSubmit) {
             _state.update { it.copy(error = ProviderError.InvalidCredentials) }
             return
         }
@@ -72,10 +86,25 @@ class LoginViewModel @Inject constructor(
             _state.update { it.copy(isSubmitting = true, error = null) }
             try {
                 authRepository.login(
+                    serverUrl = current.serverUrl,
                     username = current.username,
                     password = current.password,
                     rememberUsername = current.rememberMe,
                 )
+                _state.update { it.copy(isSubmitting = false, signedIn = true) }
+            } catch (error: Throwable) {
+                _state.update { it.copy(isSubmitting = false, error = error) }
+            }
+        }
+    }
+
+    /** Debug-only shortcut into the bundled offline catalogue. */
+    fun startDemo() {
+        if (_state.value.isSubmitting) return
+        viewModelScope.launch {
+            _state.update { it.copy(isSubmitting = true, error = null) }
+            try {
+                authRepository.startDemoSession()
                 _state.update { it.copy(isSubmitting = false, signedIn = true) }
             } catch (error: Throwable) {
                 _state.update { it.copy(isSubmitting = false, error = error) }

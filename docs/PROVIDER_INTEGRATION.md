@@ -1,11 +1,31 @@
 # Provider integration guide
 
-Status: **BLOCKED — do not call production.**
+Status: **live in debug; release still fails closed.** The panel in use is a standard
+**Xtream Codes** server, not the EZServer paths listed below, so the Xtream adapter is the one that
+ships. The release adapter `EzServerContentProvider` still throws
+`ProviderError.ServiceNotConfigured` until release access is approved.
 
-The only permitted integration target is `ContentProvider` in `:core:model`. The release adapter
-`EzServerContentProvider` currently throws `ProviderError.ServiceNotConfigured` for every call.
+## 0. Confirmed integration (2026-10-23)
 
-## 1. What is known
+| Fact | Value |
+| --- | --- |
+| API style | Xtream Codes `player_api.php` (the legacy app reports "PANEL 1 (XC)") |
+| Transport | Plain HTTP (the panel redirects streams to a raw-IP host on another port) |
+| Auth | `GET /player_api.php?username=…&password=…` returns `user_info.auth = 1` |
+| Account | status `Active`, 3 connections, output formats `m3u8,ts`, TZ `America/Mexico_City` |
+| Live catalogue | 61 categories, 1,130 channels |
+| VOD / series (not wired yet) | 52,499 titles / 12,966 series |
+| User agent | The panel's WAF returns **403 for `okhttp`**; every request sends `SunsetTV/2.0 (Android)` |
+| Stream URL | `/live/{user}/{pass}/{stream_id}.ts`, redirected to the streaming host |
+
+Verified on the Fire TV: login → Home live row → Live TV (1,130 channels) → channel playback with
+real broadcast content, and the session restores after a reinstall from the Keystore-backed store.
+
+Implemented so far: login, account summary, live categories/channels, channel search, live stream
+resolution, Keystore session storage, runtime server field and a debug provider router (demo vs
+live). Not yet: VOD, series, episodes, EPG, catch-up.
+
+## 1. What is known (legacy EZServer paths)
 
 The legacy APK exposed the endpoint names below (spec Appendix B). These are the only known API
 facts. There is no approved base URL, request/response schema, authentication header format,

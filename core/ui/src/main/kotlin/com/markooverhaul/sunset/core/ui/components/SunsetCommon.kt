@@ -63,9 +63,16 @@ fun SunsetFilterRow(
     }
 }
 
+/**
+ * True while the synthetic demo catalogue is signed in. Provided once by the app shell so every
+ * screen can hide demo-only chrome when a real panel is active.
+ */
+val LocalDemoMode = androidx.compose.runtime.compositionLocalOf { false }
+
 /** Quiet, dismissible-free banner that makes the demo/offline mode unmistakable. */
 @Composable
 fun SunsetDemoBanner(modifier: Modifier = Modifier) {
+    if (!LocalDemoMode.current) return
     Row(
         modifier = modifier
             .fillMaxWidth()

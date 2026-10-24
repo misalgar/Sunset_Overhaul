@@ -79,6 +79,8 @@
     <!-- Login -->
     <string name="login_title">Welcome back</string>
     <string name="login_subtitle">Sign in to start watching</string>
+    <string name="login_server">Server address</string>
+    <string name="login_server_hint">http://host:8080</string>
     <string name="login_username">Username</string>
     <string name="login_password">Password</string>
     <string name="login_show_password">Show password</string>
@@ -92,7 +94,8 @@
     <string name="login_error_expired">This account has expired. Contact your provider.</string>
     <string name="login_error_network">We cannot reach Sunset. Check your connection.</string>
     <string name="login_error_not_configured">The service is not configured. Provider access has not been approved.</string>
-    <string name="login_demo_hint">Demo build: any non-empty username and password will start a local demo session.</string>
+    <string name="login_demo_hint">Demo build: the offline catalogue needs no server or account.</string>
+    <string name="login_demo_action">Explore the demo</string>
     <string name="login_help_title">Need help?</string>
     <string name="login_help_body">Your content provider supplies your account and support details. No support contact is configured yet.</string>
 
@@ -265,6 +268,7 @@
     <string name="player_controls">Player controls</string>
     <string name="player_seek">Seek</string>
     <string name="player_live_hint">Live demo playback uses the bundled sample. Seeking is disabled.</string>
+    <string name="player_live_seek_hint">Live stream. Seeking is disabled.</string>
     <string name="player_close_controls">Hide controls</string>
 
     <!-- Parental -->

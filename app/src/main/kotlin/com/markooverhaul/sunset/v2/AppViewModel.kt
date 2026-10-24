@@ -96,11 +96,9 @@ class AppViewModel @Inject constructor(
             authRepository.signOut()
         }
 
-        if (BuildConfig.DEBUG) {
-            authRepository.startDemoSession()
-            _state.update { it.copy(startup = StartupState.Ready) }
-        } else {
-            _state.update { it.copy(startup = StartupState.NeedsLogin) }
-        }
+        // No stored session: show the login screen. Debug builds keep the offline demo one tap
+        // away ("Explore the demo"), but auto-entering it would hide the server field on every
+        // launch and make a real panel impossible to reach after signing out.
+        _state.update { it.copy(startup = StartupState.NeedsLogin) }
     }
 }

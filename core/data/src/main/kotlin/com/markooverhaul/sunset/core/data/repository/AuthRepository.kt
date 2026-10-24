@@ -21,6 +21,7 @@ class AuthRepository @Inject constructor(
 ) {
     val session: Flow<Session?> = sessionStore.session
     val rememberedUsername: Flow<String?> = sessionStore.rememberedUsername
+    val lastServerUrl: Flow<String?> = sessionStore.lastServerUrl
 
     /** Restores a stored token. Returns null when there is no stored session. */
     suspend fun restore(): Session? {
@@ -36,13 +37,16 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun login(
+        serverUrl: String?,
         username: String,
         password: String,
         rememberUsername: Boolean,
     ): Session {
-        val session = provider.login(username.trim(), password)
+        val normalizedServer = serverUrl?.trim()?.takeIf { it.isNotEmpty() }
+        val session = provider.login(normalizedServer, username.trim(), password)
         sessionStore.save(session)
         sessionStore.setRememberedUsername(if (rememberUsername) username.trim() else null)
+        sessionStore.setLastServerUrl(normalizedServer)
         return session
     }
 
@@ -51,7 +55,10 @@ class AuthRepository @Inject constructor(
      * Home. Release builds never call this because the demo provider is not bound.
      */
     suspend fun startDemoSession(): Session =
-        provider.login(DEMO_USERNAME, DEMO_PASSWORD).also { sessionStore.save(it) }
+        provider.login(null, DEMO_USERNAME, DEMO_PASSWORD).also {
+            sessionStore.save(it)
+            sessionStore.setLastServerUrl(null)
+        }
 
     suspend fun signOut() {
         sessionStore.clear()

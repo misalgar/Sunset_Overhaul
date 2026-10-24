@@ -40,6 +40,7 @@ fun SunsetTextField(
     onImeAction: () -> Unit = {},
     isError: Boolean = false,
     supportingText: String? = null,
+    placeholder: String? = null,
     enabled: Boolean = true,
 ) {
     OutlinedTextField(
@@ -48,6 +49,9 @@ fun SunsetTextField(
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         label = { Text(text = label, style = MaterialTheme.typography.bodyLarge) },
+        placeholder = placeholder?.let {
+            { Text(text = it, color = SunsetColors.TextTertiary) }
+        },
         leadingIcon = leadingIcon?.let {
             {
                 Icon(imageVector = it, contentDescription = null, tint = SunsetColors.TextSecondary)

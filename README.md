@@ -3,8 +3,9 @@
 A new Kotlin + Jetpack Compose streaming client for Android phones, tablets, Android TV and Fire TV.
 This repository is a **from-scratch scaffold**; it does not patch, decompile or reuse the legacy APK.
 
-The app builds and demos entirely offline against a local fake provider. No production provider
-endpoint, credential, token or stream URL is present or called.
+The app builds and demos entirely offline against a local fake provider, and debug builds can also
+sign in to a live Xtream Codes panel entered on the login screen. No endpoint, credential, token or
+stream URL is stored in the repository; release builds still bind the fail-closed adapter.
 
 ## Status
 
@@ -19,7 +20,8 @@ endpoint, credential, token or stream URL is present or called.
 | Bundled sample video for the player | Complete (`core/player/src/main/res/raw/sample_placeholder.mp4`) |
 | English + Spanish UI | Complete; all strings live in `:core:ui` |
 | Release fail-closed provider binding | Complete |
-| Real EZServer integration | **Blocked** — no approved access, docs or test server |
+| Live Xtream Codes login, account, live categories/channels, live playback (debug) | Complete |
+| VOD, series and EPG from the live panel | Next slice |
 
 Builds, lint and JVM tests were verified on 2026-10-23; see [Verification](#verification) and
 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for exact commands and results. Manual
@@ -39,9 +41,23 @@ phone and TV demo flows still need a device or emulator.
 
 On Windows use `gradlew.bat`.
 
+## Signing in to a live panel (debug)
+
+The debug build keeps the offline demo and adds a real Xtream Codes provider behind the same
+`ContentProvider` contract.
+
+1. Launch the debug build; the login screen appears (no session is created automatically).
+2. Enter the **server address** (`http://host:8080`), username and password, then **Sign in**.
+   The server form remembers the last address; the session token is encrypted with the Android
+   Keystore.
+3. **Explore the demo** keeps the offline catalogue available with no server or account.
+
+Cleartext HTTP is permitted in debug because the panel redirects streams to a raw-IP host; release
+keeps the scoped policy in `app/src/main/res/xml/network_security_config.xml`.
+
 ## Demo flow (offline)
 
-1. Launch the debug build. A synthetic demo session starts automatically.
+1. Launch the debug build and tap **Explore the demo** on the login screen.
 2. **Home → hero → Details → Play** opens the bundled sample video.
 3. **Live TV → any channel** opens live-style playback; **Open guide** shows the EPG grid.
 4. **Search** (from More on a phone, or the top bar on a tablet/TV) → result → Details → Play.

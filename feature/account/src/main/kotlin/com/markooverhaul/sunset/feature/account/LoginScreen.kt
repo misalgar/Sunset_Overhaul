@@ -61,11 +61,13 @@ fun LoginRoute(
     LoginScreen(
         state = state,
         demoMode = demoMode,
+        onServerChange = viewModel::onServerChange,
         onUsernameChange = viewModel::onUsernameChange,
         onPasswordChange = viewModel::onPasswordChange,
         onToggleRememberMe = viewModel::toggleRememberMe,
         onTogglePasswordVisible = viewModel::togglePasswordVisible,
         onSubmit = viewModel::submit,
+        onDemo = viewModel::startDemo,
         modifier = modifier,
     )
 }
@@ -74,19 +76,23 @@ fun LoginRoute(
 fun LoginScreen(
     state: LoginUiState,
     demoMode: Boolean,
+    onServerChange: (String) -> Unit,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onToggleRememberMe: () -> Unit,
     onTogglePasswordVisible: () -> Unit,
     onSubmit: () -> Unit,
+    onDemo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isTv = LocalIsTelevision.current
     var showHelp by rememberSaveable { mutableStateOf(false) }
+    val serverFocus = remember { FocusRequester() }
     val usernameFocus = remember { FocusRequester() }
+    val passwordFocus = remember { FocusRequester() }
 
     LaunchedEffect(isTv) {
-        if (isTv) runCatching { usernameFocus.requestFocus() }
+        if (isTv) runCatching { serverFocus.requestFocus() }
     }
 
     Box(
@@ -127,17 +133,31 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             SunsetTextField(
+                value = state.serverUrl,
+                onValueChange = onServerChange,
+                label = stringResource(R.string.login_server),
+                placeholder = stringResource(R.string.login_server_hint),
+                modifier = Modifier.focusRequester(serverFocus),
+                imeAction = ImeAction.Next,
+                // The IME "Next" key must hand focus to the username field; without this the key
+                // does nothing and everything is typed into the server field.
+                onImeAction = { runCatching { usernameFocus.requestFocus() } },
+                enabled = !state.isSubmitting,
+            )
+            SunsetTextField(
                 value = state.username,
                 onValueChange = onUsernameChange,
                 label = stringResource(R.string.login_username),
-                modifier = if (isTv) Modifier.focusRequester(usernameFocus) else Modifier,
+                modifier = Modifier.focusRequester(usernameFocus),
                 imeAction = ImeAction.Next,
+                onImeAction = { runCatching { passwordFocus.requestFocus() } },
                 enabled = !state.isSubmitting,
             )
             SunsetTextField(
                 value = state.password,
                 onValueChange = onPasswordChange,
                 label = stringResource(R.string.login_password),
+                modifier = Modifier.focusRequester(passwordFocus),
                 trailingText = stringResource(
                     if (state.passwordVisible) R.string.login_hide_password else R.string.login_show_password,
                 ),
@@ -208,6 +228,12 @@ fun LoginScreen(
             )
 
             if (demoMode) {
+                TextButton(onClick = onDemo, enabled = !state.isSubmitting) {
+                    Text(
+                        text = stringResource(R.string.login_demo_action),
+                        color = SunsetColors.AccentPrimary,
+                    )
+                }
                 Text(
                     text = stringResource(R.string.login_demo_hint),
                     style = MaterialTheme.typography.bodySmall,

@@ -39,7 +39,7 @@ class EzServerContentProvider @Inject constructor(
         reason = "EZServer integration is blocked: no test access, API documentation or approval.",
     )
 
-    override suspend fun login(username: String, password: String): Session = blocked()
+    override suspend fun login(serverUrl: String?, username: String, password: String): Session = blocked()
     override suspend fun restoreSession(token: String): Session = blocked()
     override suspend fun getAccountSummary(): AccountSummary = blocked()
 

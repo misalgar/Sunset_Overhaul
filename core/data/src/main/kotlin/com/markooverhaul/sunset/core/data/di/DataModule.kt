@@ -5,7 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
-import com.markooverhaul.sunset.core.data.session.DataStoreSessionStore
+import com.markooverhaul.sunset.core.data.session.EncryptedSessionStore
 import com.markooverhaul.sunset.core.data.session.SessionStore
 import dagger.Binds
 import dagger.Module
@@ -21,7 +21,7 @@ abstract class DataModule {
 
     @Binds
     @Singleton
-    abstract fun bindSessionStore(impl: DataStoreSessionStore): SessionStore
+    abstract fun bindSessionStore(impl: EncryptedSessionStore): SessionStore
 
     companion object {
         @Provides

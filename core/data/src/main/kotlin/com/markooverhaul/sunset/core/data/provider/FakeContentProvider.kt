@@ -39,7 +39,7 @@ class FakeContentProvider @Inject constructor() : ContentProvider {
 
     override val status: ProviderStatus = ProviderStatus.Configured("Sunset demo catalogue")
 
-    override suspend fun login(username: String, password: String): Session {
+    override suspend fun login(serverUrl: String?, username: String, password: String): Session {
         tick()
         if (username.isBlank() || password.isBlank()) throw ProviderError.InvalidCredentials
         return Session(

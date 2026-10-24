@@ -202,7 +202,11 @@ sealed interface ProviderStatus {
 interface ContentProvider {
     val status: ProviderStatus
 
-    suspend fun login(username: String, password: String): Session
+    /**
+     * [serverUrl] is the provider panel address entered by the viewer, or null for the bundled
+     * demo catalogue. Providers that are configured at build time may ignore it.
+     */
+    suspend fun login(serverUrl: String?, username: String, password: String): Session
     suspend fun restoreSession(token: String): Session
     suspend fun getAccountSummary(): AccountSummary
 

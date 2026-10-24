@@ -175,7 +175,8 @@ fun PlayerScreen(
 
         // When the controls are hidden, keep the placeholder marker on screen. The controls
         // themselves repeat it in the title block so it is never mistaken for provider video.
-        if (!controlsVisible && !error) {
+        // The marker only applies to the bundled demo clip; a real stream is never labelled demo.
+        if (!controlsVisible && !error && playback.isPlaceholder) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -305,13 +306,15 @@ private fun PlayerControls(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Text(
-                    text = stringResource(R.string.player_placeholder),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = SunsetColors.TextTertiary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (playback.isPlaceholder) {
+                    Text(
+                        text = stringResource(R.string.player_placeholder),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SunsetColors.TextTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (live) {
                 Row(
@@ -376,7 +379,10 @@ private fun PlayerControls(
         ) {
             if (live) {
                 Text(
-                    text = stringResource(R.string.player_live_hint),
+                    text = stringResource(
+                        if (playback.isPlaceholder) R.string.player_live_hint
+                        else R.string.player_live_seek_hint,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = SunsetColors.TextSecondary,
                 )

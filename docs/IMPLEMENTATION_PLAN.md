@@ -122,6 +122,31 @@ design tokens and UI components, never on each other.
 - Device-aware type scale (TV = 1.15× phone, body never below 18 sp).
 - 285 English strings mirrored 1:1 in Spanish under `:core:ui`.
 
+### 5.5 Live Xtream provider (first slice, 2026-10-23)
+
+The panel was identified from the legacy app's own traffic (system proxy capture on the Fire TV,
+hostnames only) and confirmed with one read-only auth request, then a categories request.
+
+- `XtreamApi` / `XtreamContentProvider` in `:core:network`: `player_api.php` login, account summary,
+  live categories, live channels, channel search, live stream URLs, JSON disk cache (6 h).
+- Panel WAF rejects the default `okhttp` agent; requests send `SunsetTV/2.0 (Android)`.
+- `RoutingContentProvider` (debug binding) serves the demo catalogue when the server field is empty
+  and the live panel when it is set; the mode is re-derived from the stored token on every start.
+- `EncryptedSessionStore`: AES-256-GCM key in the Android Keystore; the token carries the Xtream
+  credentials because Xtream is stateless.
+- Login screen gained a server field with focus chaining (IME Next moves between fields) and an
+  **Explore the demo** action; debug no longer auto-starts a demo session.
+- `network_security_config`: release permits cleartext only for the provider host; debug permits it
+  because streams redirect to a raw-IP host.
+- Player: the "placeholder sample" marker now shows only for the bundled demo clip, never over a
+  real stream.
+
+Verified on the Fire TV: server → username/password → Home live row → Live TV (1,130 channels,
+real categories) → channel playback with live broadcast content; session survives reinstall.
+
+Next: VOD and series lists (52,499 / 12,966 items — needs Room or a disk cache, not a per-launch
+download), series detail/episodes, EPG (`xmltv.php` or `get_short_epg`), then release binding.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
@@ -229,8 +254,9 @@ scope until provider access is approved.
 
 ## 8. Known limitations
 
-- Real provider integration is blocked (see `PROVIDER_INTEGRATION.md`). Every EZServer call fails
-  closed.
+- The live panel works in **debug** only; the release build still binds the fail-closed adapter.
+- VOD, series, episodes, EPG and catch-up are not implemented against the live panel yet; those
+  screens show empty rows until the next slice.
 - Parental controls and profiles are placeholders.
 - Autoplay-next works for series episodes; cross-content autoplay is not implemented.
 - Track selection, PiP and aspect-ratio switching are settings placeholders.

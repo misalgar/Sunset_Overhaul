@@ -2,6 +2,7 @@ package com.markooverhaul.sunset.core.player
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -112,7 +113,15 @@ class Media3PlaybackEngine @Inject constructor(
             _state.value = PlaybackState(
                 isPreparing = true,
                 isLive = live,
+                isPlaceholder = source.url.startsWith(DEMO_SCHEME),
                 durationMs = 0L,
+            )
+            // Host only: the URL path carries the account credentials and must never be logged.
+            Log.i(
+                "SunsetPlayer",
+                "prepare scheme=${mediaItem.localConfiguration?.uri?.scheme} " +
+                    "host=${mediaItem.localConfiguration?.uri?.host} " +
+                    "port=${mediaItem.localConfiguration?.uri?.port} live=$live",
             )
             player.setMediaItem(mediaItem, if (live) 0L else startPositionMs.coerceAtLeast(0L))
             player.prepare()

@@ -15,6 +15,9 @@ data class PlaybackState(
     val bufferedPositionMs: Long = 0L,
     val ended: Boolean = false,
     val isLive: Boolean = false,
+    /** True only when the bundled demo clip is playing, so the "not provider content" marker
+     *  never covers a real stream. */
+    val isPlaceholder: Boolean = false,
     val aspectMode: AspectMode = AspectMode.FIT,
     val speed: Float = 1f,
     val error: PlaybackFailure? = null,

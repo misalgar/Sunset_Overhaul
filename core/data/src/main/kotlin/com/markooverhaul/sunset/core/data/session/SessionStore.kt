@@ -22,11 +22,13 @@ import javax.inject.Singleton
 interface SessionStore {
     val session: Flow<Session?>
     val rememberedUsername: Flow<String?>
+    val lastServerUrl: Flow<String?>
 
     suspend fun read(): Session?
     suspend fun save(session: Session)
     suspend fun clear()
     suspend fun setRememberedUsername(username: String?)
+    suspend fun setLastServerUrl(url: String?)
 }
 
 @Singleton
@@ -50,6 +52,8 @@ class DataStoreSessionStore @Inject constructor(
     }
 
     override val rememberedUsername: Flow<String?> = dataStore.data.map { it[KEY_REMEMBERED_USERNAME] }
+
+    override val lastServerUrl: Flow<String?> = dataStore.data.map { it[KEY_LAST_SERVER] }
 
     override suspend fun read(): Session? = session.firstOrNull()
 
@@ -79,11 +83,19 @@ class DataStoreSessionStore @Inject constructor(
         }
     }
 
+    override suspend fun setLastServerUrl(url: String?) {
+        dataStore.edit { prefs ->
+            if (url.isNullOrBlank()) prefs.remove(KEY_LAST_SERVER)
+            else prefs[KEY_LAST_SERVER] = url.trim()
+        }
+    }
+
     private companion object {
         val KEY_USERNAME = stringPreferencesKey("session_username")
         val KEY_TOKEN = stringPreferencesKey("session_token")
         val KEY_DEMO = stringPreferencesKey("session_is_demo")
         val KEY_EXPIRES_AT = stringPreferencesKey("session_expires_at")
         val KEY_REMEMBERED_USERNAME = stringPreferencesKey("remembered_username")
+        val KEY_LAST_SERVER = stringPreferencesKey("last_server_url")
     }
 }

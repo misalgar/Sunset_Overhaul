@@ -17,7 +17,7 @@ class FakeContentProviderTest {
     @Test
     fun `login rejects blank credentials`() = runTest {
         try {
-            provider.login(" ", "")
+            provider.login(null, " ", "")
             fail("Expected InvalidCredentials")
         } catch (expected: ProviderError.InvalidCredentials) {
             // expected
@@ -26,7 +26,7 @@ class FakeContentProviderTest {
 
     @Test
     fun `login returns a demo session`() = runTest {
-        val session = provider.login("demo", "demo")
+        val session = provider.login(null, "demo", "demo")
 
         assertTrue(session.isDemo)
         assertEquals("demo", session.username)
