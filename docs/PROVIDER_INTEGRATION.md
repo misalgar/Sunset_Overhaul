@@ -7,23 +7,83 @@ ships. The release adapter `EzServerContentProvider` still throws
 
 ## 0. Confirmed integration (2026-10-23)
 
-| Fact | Value |
+The panel is a stock **Xtream Codes** server, not the EZServer paths in §1. The real host, port and
+streaming IPs are kept out of the repository (see §0.6); the adapter takes them from the login form.
+
+### 0.1 Endpoint
+
+| Item | Value |
 | --- | --- |
-| API style | Xtream Codes `player_api.php` (the legacy app reports "PANEL 1 (XC)") |
-| Transport | Plain HTTP (the panel redirects streams to a raw-IP host on another port) |
-| Auth | `GET /player_api.php?username=…&password=…` returns `user_info.auth = 1` |
-| Account | status `Active`, 3 connections, output formats `m3u8,ts`, TZ `America/Mexico_City` |
-| Live catalogue | 61 categories, 1,130 channels |
-| VOD / series (not wired yet) | 52,499 titles / 12,966 series |
-| User agent | The panel's WAF returns **403 for `okhttp`**; every request sends `SunsetTV/2.0 (Android)` |
-| Stream URL | `/live/{user}/{pass}/{stream_id}.ts`, redirected to the streaming host |
+| Base URL | `http://<provider-host>:8080` (plain HTTP, nginx) |
+| API path | `/player_api.php` |
+| Auth | `GET /player_api.php?username=<user>&password=<pass>` |
+| Actions | `&action=get_live_categories`, `get_live_streams`, `get_vod_categories`, `get_vod_streams`, `get_series_categories`, `get_series`, `get_series_info`, `get_vod_info`, `get_short_epg` |
+| Live stream | `GET /live/<user>/<pass>/<stream_id>.ts` (302 to the streaming host) |
+| Movie stream | `/movie/<user>/<pass>/<stream_id>.<container_extension>` |
+| Episode stream | `/series/<user>/<pass>/<episode_id>.<container_extension>` |
+| No pagination | Lists are returned whole; page client-side |
 
-Verified on the Fire TV: login → Home live row → Live TV (1,130 channels) → channel playback with
-real broadcast content, and the session restores after a reinstall from the Keystore-backed store.
+### 0.2 Auth response (observed)
 
-Implemented so far: login, account summary, live categories/channels, channel search, live stream
-resolution, Keystore session storage, runtime server field and a debug provider router (demo vs
-live). Not yet: VOD, series, episodes, EPG, catch-up.
+`user_info`: `username`, `auth` (`1` = ok), `status` (`Active`), `exp_date` (epoch **seconds**),
+`max_connections` (string), `allowed_output_formats` (`["m3u8","ts"]`), `is_trial`.
+`server_info`: `time_now`, `timezone` (`America/Mexico_City`), `url`, `port`.
+Failure is `auth: 0` with a status such as `Disabled`/`Expired`, not an HTTP error. Types are
+inconsistent between panels (`1` vs `"1"`, ids as number or string), hence the flexible serializers
+in `XtreamJson.kt`.
+
+### 0.3 Catalogue (observed)
+
+| Call | Items | Shape |
+| --- | --- | --- |
+| `get_live_categories` | 61 | `category_id`, `category_name`, `parent_id` |
+| `get_live_streams` | 1,130 | `num`, `name`, `stream_id`, `stream_icon`, `epg_channel_id`, `category_id`, `tv_archive`, `tv_archive_duration` |
+| `get_vod_categories` | 40 | same category shape |
+| `get_vod_streams` | 52,499 | `num`, `name`, `stream_id`, `stream_icon`, `rating`, `added`, `category_id`, `container_extension` |
+| `get_series_categories` | 36 | same category shape |
+| `get_series` | 12,966 | `num`, `name`, `series_id`, `cover`, `plot`, `cast`, `genre`, `releaseDate`, `rating`, `category_id` |
+
+`get_vod_streams` is **16.6 MB** and takes ~10 s from a desktop: it must be cached (Room or disk),
+never fetched on every launch. Live lists are small (~400 KB) and cached for 6 h.
+
+### 0.4 WAF and transport rules
+
+- The default `okhttp` user agent gets **403 Forbidden** (nginx). Every request sends
+  `SunsetTV/2.0 (Android)`; verified 200 with that agent.
+- `Range` requests are rejected (404/403), so payload size can only be measured by reading the body.
+- The API is HTTP. Streams redirect to a **raw IP on port 8080** that changes between sessions, so a
+  host allowlist cannot cover playback: release keeps the scoped policy, debug permits cleartext.
+- The account allows 3 simultaneous connections; the player uses one.
+
+### 0.5 How the host was recovered (repeatable)
+
+The legacy app (`com.nathnetwork.sunset`, XCIPTV 5.0.1) has no server field: the panel is baked in
+("SELECT PANEL -> SUNSET MEDIA"), the account screen shows only user/expiry, and the app is not
+debuggable, so `run-as`, `/proc` and `logcat` do not expose the URL.
+
+1. Confirm the API host IP from the device: `adb shell cat /proc/net/tcp`, filter the app UID.
+2. TLS certificate on that IP: `CN=pixxxels.cc` (`s1..s33` SANs) -> shared hosting, hostname still
+   needed.
+3. Capture the hostname with the Android system proxy: run a listener that logs only the request
+   line, then `adb shell settings put global http_proxy <pc-ip>:8888`, relaunch the app, read the
+   plain-HTTP `GET /player_api.php?...` line, then reset the proxy to `:0`.
+4. `adb reverse` is broken on this adb build, and the Fire TV cannot reach the PC without a temporary
+   inbound firewall rule for the listener port (remove it afterwards).
+5. Delete the capture log: the plain-HTTP request line contains the credentials.
+
+### 0.6 What is stored where
+
+| Data | Location |
+| --- | --- |
+| API shape, WAF rules, stream patterns, discovery steps | this file (committed) |
+| Host, port, streaming IPs, account username | `provider.local.md` (gitignored, never committed) |
+| Password | not stored in the repo or in `provider.local.md`; enter it on the login screen |
+| Runtime session token (credentials, encrypted) | Android Keystore via `EncryptedSessionStore` |
+| Legacy app on the Fire TV | left signed in; used only for discovery |
+
+The host appears once in tracked code, in `app/src/main/res/xml/network_security_config.xml`, because
+the release build needs a cleartext exception for it. Move it to an untracked build value if the
+repository is ever published.
 
 ## 1. What is known (legacy EZServer paths)
 

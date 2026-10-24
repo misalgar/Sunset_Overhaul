@@ -22,6 +22,7 @@ schemas/
 .env.*
 secrets.properties
 api-keys.properties
+provider.local.md
 
 # Logs / tooling
 *.log
