@@ -37,6 +37,7 @@ import com.markooverhaul.sunset.core.model.SeriesSummary
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.SunsetFilterRow
+import com.markooverhaul.sunset.core.ui.components.LocalDemoMode
 import com.markooverhaul.sunset.core.ui.components.SunsetPosterCard
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
 
@@ -67,11 +68,12 @@ fun SeriesScreen(
 ) {
     val isTv = LocalIsTelevision.current
     val gutter = if (isTv) 48.dp else 16.dp
-    val posterWidth = if (isTv) 184.dp else 150.dp
+    // Six columns on TV keep the poster plus its two-line caption inside the viewport height.
+    val posterWidth = if (isTv) 140.dp else 150.dp
     val refresh = series.loadState.refresh
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = if (isTv) 200.dp else 150.dp),
+        columns = GridCells.Adaptive(minSize = if (isTv) 140.dp else 150.dp),
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = gutter, end = gutter, bottom = 40.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -122,10 +124,16 @@ fun SeriesScreen(
         } else if (series.itemCount == 0) {
             item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 SunsetEmptyState(
-                    title = stringResource(R.string.series_empty_title),
-                    body = stringResource(R.string.series_empty_body),
-                    actionLabel = stringResource(R.string.action_retry),
-                    onAction = { series.retry() },
+                    title = stringResource(
+                        if (LocalDemoMode.current) R.string.series_empty_title
+                        else R.string.series_provider_unavailable_title,
+                    ),
+                    body = stringResource(
+                        if (LocalDemoMode.current) R.string.series_empty_body
+                        else R.string.series_provider_unavailable_body,
+                    ),
+                    actionLabel = if (LocalDemoMode.current) stringResource(R.string.action_retry) else null,
+                    onAction = if (LocalDemoMode.current) ({ series.retry() }) else null,
                 )
             }
         }
@@ -136,10 +144,13 @@ fun SeriesScreen(
             span = { GridItemSpan(1) },
         ) { index ->
             val summary = series[index] ?: return@items
-            val subtitle = if (summary.seasonCount == 1) {
-                stringResource(R.string.season_count_one, summary.seasonCount)
-            } else {
-                stringResource(R.string.season_count, summary.seasonCount)
+            // The Xtream series list has no season count; it only arrives with get_series_info, so
+            // fall back to the year instead of claiming "0 seasons".
+            val subtitle = when {
+                summary.seasonCount == 1 -> stringResource(R.string.season_count_one, 1)
+                summary.seasonCount > 1 -> stringResource(R.string.season_count, summary.seasonCount)
+                summary.year != null -> summary.year.toString()
+                else -> null
             }
             SunsetPosterCard(
                 title = summary.title,

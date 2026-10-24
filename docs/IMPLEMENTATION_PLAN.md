@@ -144,8 +144,25 @@ hostnames only) and confirmed with one read-only auth request, then a categories
 Verified on the Fire TV: server → username/password → Home live row → Live TV (1,130 channels,
 real categories) → channel playback with live broadcast content; session survives reinstall.
 
-Next: VOD and series lists (52,499 / 12,966 items — needs Room or a disk cache, not a per-launch
-download), series detail/episodes, EPG (`xmltv.php` or `get_short_epg`), then release binding.
+### 5.6 VOD and series metadata (2026-10-24)
+
+- `get_vod_categories` / `get_vod_streams` (52,499 items, 16.6 MB) and `get_series_categories` /
+  `get_series` (12,966 items) with in-memory paging (60 per page) over a 6 h disk cache keyed by
+  account. The cache survives restarts; it used to be wiped on every restore, which forced a full
+  re-download per launch.
+- `get_vod_info` enriches a movie with backdrop, plot, cast, director, genre and runtime.
+- `get_series_info` maps the season → episodes object into `SeriesDetail`/`Season`/`Episode`, with
+  duration, still, air date and per-episode stream extensions.
+- Search now covers live, movies and series (40 results per group).
+- Playback uses each item's `container_extension` instead of a hardcoded `.mp4`.
+- Home loads live first and the large catalogues second, so it is usable while VOD downloads.
+- TV grids use six 140 dp columns so the poster and its two-line caption fit the viewport; the Home
+  hero grew to 320-380 dp so a two-line title no longer clips.
+
+Verified on the Fire TV: movie grid and captions, movie detail (`get_vod_info`), movie playback,
+series grid, series detail with 12 episodes and cast, episode playback, three-way search.
+
+Next: EPG (`xmltv.php` or `get_short_epg`), series season switching polish, then release binding.
 
 ## 6. Verification
 
@@ -195,9 +212,27 @@ verified on the device:
 | "Going up and down over the search box opens the keyboard every time." | The TV search field was a focusable text field, so gaining focus showed the IME. | The TV search box is now a plain focus stop (`canFocus = editing`); only Select/Enter on it enters edit mode and shows the IME. D-pad traversal passes over it without the keyboard, Down moves into the results, and submitting from the IME (Search/Next/Done/Go) hides the keyboard and focuses the first result. |
 | Result group header was half clipped once the first result took focus. | The redundant "Search" title pushed the results viewport below the height of one poster group, so bringing the focused card into view scrolled its section header off the top. | The "Search" title is hidden on TV (the nav pill and field placeholder already say it), which gives the results the full height and keeps the group header, poster and caption on screen together. |
 
-Re-test on the same TV is pending; see `docs/RUNNING_ON_DEVICE.md` for the install command.
+### 6.4 Fire TV live-provider smoke pass (2026-10-23)
 
-### 6.4 Toolchain status
+Current debug build tested on the same Fire TV AFTMM (1920x1080 UI):
+
+- Session restored after reinstall; Home and Live TV loaded 1,130 channels and 61 categories.
+- D-pad category/navigation and Back returned between More, Guide, Settings and top-level tabs.
+- Guide channel rows fit on screen and correctly report that EPG data is not available yet.
+- Search `Travel` returned two matching live channels; Select opened the keyboard, Next dismissed it
+  and moved focus to the first result. Up/down traversal did not open the keyboard. Test history was
+  cleared afterward.
+- A real live stream played on the current build with the `LIVE` state, no seek bar and no demo
+  watermark. Channel logos loaded after adding Coil's OkHttp network fetcher.
+- My List's empty state and Settings account rows fit. Movies/Series now explain that the live
+  provider catalogue is not connected in this version; demo copy remains separate.
+- Debug/release assemble, lint and JVM tests pass (0 lint errors; 10 tests).
+
+The device pass was TV-only; no phone/tablet was connected. Guide is intentionally empty until EPG
+is implemented. Release cleartext remains limited to the panel hostname, so playback through its
+rotating raw-IP redirect is not release-ready; debug allows cleartext for testing.
+
+### 6.5 Toolchain status
 
 Verified on 2026-10-23 on Windows with a portable toolchain:
 

@@ -81,10 +81,32 @@ debuggable, so `run-as`, `/proc` and `logcat` do not expose the URL.
 | Runtime session token (credentials, encrypted) | Android Keystore via `EncryptedSessionStore` |
 | Legacy app on the Fire TV | left signed in; used only for discovery |
 
-No provider hostname is tracked. The release network security config is generated at build time
-(`GenerateNetworkSecurityConfig`) from `sunset.provider.host` in the gitignored `local.properties`;
-without that key the release config permits no cleartext host at all. Debug keeps its own override
-in `app/src/debug/res/xml/network_security_config.xml`.
+No provider hostname is tracked. A variant-specific network security config is generated at build
+time (`GenerateNetworkSecurityConfig`) from `sunset.provider.host` in the gitignored
+`local.properties`; without that key the release config permits no cleartext host. Debug permits
+cleartext because the live stream redirects to a raw-IP host that varies by session. Release
+playback remains blocked until there is a stable approved stream-host policy or HTTPS.
+
+### 0.7 Status
+
+Implemented: login, account summary, live categories/channels and playback, the VOD catalogue with
+detail (`get_vod_info`), the series catalogue with detail and episodes (`get_series_info`),
+three-way search, Keystore session storage, a runtime server field and a debug provider router
+(demo vs live).
+
+**Catalogue handling.** VOD and series lists are fetched once, cached on disk for six hours and
+paged in memory (60 per page): the panel has no pagination and the VOD payload is 16.6 MB. The cache
+is keyed by account, survives restarts and is dropped only when a different account signs in. Title
+years are split out of names like `Name (1999) SUB`, and playback uses the panel's
+`container_extension` instead of assuming MP4.
+
+**Known limits.** Some VOD files are HEVC/MKV and fail on older devices with "stream not
+supported" — a device codec limit, not a provider error. EPG and catch-up are still pending.
+
+Verified on the Fire TV (2026-10-24): live login and playback; movie grid with posters and captions;
+movie detail with backdrop, runtime, genre, plot and cast from `get_vod_info`; movie playback;
+series grid; series detail with seasons/episodes and episode playback; search across live, movies
+and series.
 
 ## 1. What is known (legacy EZServer paths)
 

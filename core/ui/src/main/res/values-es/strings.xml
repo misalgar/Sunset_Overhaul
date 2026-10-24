@@ -146,8 +146,12 @@
     <string name="sort_year">Año</string>
     <string name="movies_empty_title">No hay películas en esta categoría</string>
     <string name="movies_empty_body">Prueba otra categoría o quita el filtro.</string>
+    <string name="movies_provider_unavailable_title">Las películas aún no están conectadas</string>
+    <string name="movies_provider_unavailable_body">El catálogo de películas del proveedor en directo aún no está disponible en esta versión.</string>
     <string name="series_empty_title">No hay series en esta categoría</string>
     <string name="series_empty_body">Prueba otra categoría o quita el filtro.</string>
+    <string name="series_provider_unavailable_title">Las series aún no están conectadas</string>
+    <string name="series_provider_unavailable_body">El catálogo de series del proveedor en directo aún no está disponible en esta versión.</string>
     <string name="catalogue_result_count">%1$d títulos</string>
     <string name="load_more_error">No se pudieron cargar más títulos.</string>
 
@@ -172,7 +176,8 @@
     <string name="search_group_movies">Películas (%1$d)</string>
     <string name="search_group_series">Series (%1$d)</string>
     <string name="search_empty_title">Busca en tu biblioteca</string>
-    <string name="search_empty_body">Encuentra un canal, una película o una serie. Los resultados proceden del catálogo de demostración local.</string>
+    <string name="search_empty_body_demo">Encuentra un canal, una película o una serie en el catálogo de demostración sin conexión.</string>
+    <string name="search_empty_body_live">Busca en canales en directo, películas y series.</string>
     <string name="search_no_results_title">Sin resultados para “%1$s”</string>
     <string name="search_no_results_body">Prueba otro título o explora Películas.</string>
     <string name="search_min_chars">Escribe al menos 2 caracteres.</string>
@@ -246,7 +251,7 @@
     <string name="player_replay">Repetir</string>
     <string name="player_back">Salir del reproductor</string>
     <string name="player_error_title">Falló la reproducción</string>
-    <string name="player_error_body">No se pudo iniciar el vídeo de demostración. Es un ejemplo local; revisa la compilación de la APK.</string>
+    <string name="player_error_body">No se pudo iniciar la emisión. Comprueba tu conexión o inténtalo de nuevo.</string>
     <string name="player_preparing">Preparando el vídeo…</string>
     <string name="player_controls">Controles del reproductor</string>
     <string name="player_seek">Buscar</string>

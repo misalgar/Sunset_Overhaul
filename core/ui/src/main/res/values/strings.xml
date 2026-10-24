@@ -157,8 +157,12 @@
     <string name="sort_year">Year</string>
     <string name="movies_empty_title">No movies in this category</string>
     <string name="movies_empty_body">Try another category or clear the filter.</string>
+    <string name="movies_provider_unavailable_title">Movies aren’t connected yet</string>
+    <string name="movies_provider_unavailable_body">The live provider’s movie catalogue is not available in this version.</string>
     <string name="series_empty_title">No series in this category</string>
     <string name="series_empty_body">Try another category or clear the filter.</string>
+    <string name="series_provider_unavailable_title">Series aren’t connected yet</string>
+    <string name="series_provider_unavailable_body">The live provider’s series catalogue is not available in this version.</string>
     <string name="catalogue_result_count">%1$d titles</string>
     <string name="load_more_error">Could not load more titles.</string>
 
@@ -185,7 +189,8 @@
     <string name="search_group_movies">Movies (%1$d)</string>
     <string name="search_group_series">Series (%1$d)</string>
     <string name="search_empty_title">Search your library</string>
-    <string name="search_empty_body">Find a channel, movie or series. Results come from the local demo catalogue.</string>
+    <string name="search_empty_body_demo">Find a channel, movie or series in the offline demo catalogue.</string>
+    <string name="search_empty_body_live">Search across live channels, movies and series.</string>
     <string name="search_no_results_title">No matches for “%1$s”</string>
     <string name="search_no_results_body">Try a different title or browse Movies.</string>
     <string name="search_min_chars">Type at least 2 characters.</string>
@@ -263,7 +268,7 @@
     <string name="player_replay">Replay</string>
     <string name="player_back">Exit player</string>
     <string name="player_error_title">Playback failed</string>
-    <string name="player_error_body">The demo video could not be started. This is a local sample, so check the APK build.</string>
+    <string name="player_error_body">The stream could not be started. Check your connection or try again.</string>
     <string name="player_preparing">Preparing video…</string>
     <string name="player_controls">Player controls</string>
     <string name="player_seek">Seek</string>

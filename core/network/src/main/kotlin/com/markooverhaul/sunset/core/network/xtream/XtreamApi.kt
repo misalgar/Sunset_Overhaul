@@ -23,8 +23,9 @@ class XtreamApi @Inject constructor() {
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(45, TimeUnit.SECONDS)
+        // The VOD list is ~16.6 MB on the reference panel; a slow TV needs more than 30 s.
+        .readTimeout(90, TimeUnit.SECONDS)
+        .callTimeout(180, TimeUnit.SECONDS)
         .build()
 
     suspend fun auth(baseUrl: String, username: String, password: String): XtreamAuthResponse =
@@ -35,6 +36,7 @@ class XtreamApi @Inject constructor() {
         username: String,
         password: String,
         action: String?,
+        params: Map<String, String> = emptyMap(),
     ): String = withContext(Dispatchers.IO) {
         val url = baseUrl.toHttpUrlOrNull()
             ?.newBuilder()
@@ -42,6 +44,7 @@ class XtreamApi @Inject constructor() {
             ?.addQueryParameter("username", username)
             ?.addQueryParameter("password", password)
             ?.apply { if (action != null) addQueryParameter("action", action) }
+            ?.apply { params.forEach { (key, value) -> addQueryParameter(key, value) } }
             ?.build()
             ?: throw ProviderError.Network
 

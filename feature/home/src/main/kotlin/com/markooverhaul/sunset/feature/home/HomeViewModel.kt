@@ -78,41 +78,40 @@ class HomeViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val payload = withContext(ioDispatcher) {
+                // Fast path: live data renders immediately.
+                val (channels, guide) = withContext(ioDispatcher) {
                     coroutineScope {
-                        val movies = async { provider.getMovies(page = 1) }
-                        val series = async { provider.getSeries(page = 1) }
                         val channels = async { provider.getLiveChannels() }
                         val guide = async { provider.getGuide(days = 1) }
-                        HomePayload(
-                            movies = movies.await().items,
-                            series = series.await().items,
-                            channels = channels.await(),
-                            guide = guide.await(),
-                        )
+                        channels.await() to guide.await()
                     }
                 }
                 val now = System.currentTimeMillis()
-                val nowNext = payload.channels.associate { channel ->
-                    val programmes = payload.guide
-                        .filter { it.channelId == channel.id }
-                        .sortedBy { it.startUtcMs }
-                    channel.id to ChannelNowNext(
-                        now = programmes.firstOrNull { now >= it.startUtcMs && now < it.endUtcMs },
-                        next = programmes.firstOrNull { it.startUtcMs > now },
-                    )
-                }
-                val recentMovies = payload.movies.sortedByDescending { it.addedAtUtcMs }.take(12)
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        hero = recentMovies.firstOrNull(),
-                        liveNow = payload.channels.take(10),
-                        recentMovies = recentMovies,
-                        recentSeries = payload.series.sortedByDescending { s -> s.addedAtUtcMs }.take(12),
-                        recommended = payload.movies.sortedByDescending { m -> m.rating ?: 0.0 }.take(12),
-                        nowNext = nowNext,
+                        liveNow = channels.take(10),
+                        nowNext = nowNextOf(channels, guide, now),
                         error = null,
+                    )
+                }
+
+                // Slow path: the VOD and series catalogues are large and cache-backed; Home should
+                // not stay blank while they download on first launch.
+                val (movies, series) = withContext(ioDispatcher) {
+                    coroutineScope {
+                        val movies = async { provider.getMovies(page = 1) }
+                        val series = async { provider.getSeries(page = 1) }
+                        movies.await().items to series.await().items
+                    }
+                }
+                val recentMovies = movies.sortedByDescending { it.addedAtUtcMs }.take(12)
+                _state.update {
+                    it.copy(
+                        hero = recentMovies.firstOrNull() ?: it.hero,
+                        recentMovies = recentMovies,
+                        recentSeries = series.sortedByDescending { s -> s.addedAtUtcMs }.take(12),
+                        recommended = movies.sortedByDescending { m -> m.rating ?: 0.0 }.take(12),
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -123,10 +122,18 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private data class HomePayload(
-        val movies: List<Movie>,
-        val series: List<SeriesSummary>,
-        val channels: List<LiveChannel>,
-        val guide: List<EpgProgramme>,
-    )
+    private fun nowNextOf(
+        channels: List<LiveChannel>,
+        guide: List<EpgProgramme>,
+        now: Long,
+    ): Map<String, ChannelNowNext> = channels.associate { channel ->
+        val programmes = guide
+            .filter { it.channelId == channel.id }
+            .sortedBy { it.startUtcMs }
+        channel.id to ChannelNowNext(
+            now = programmes.firstOrNull { now >= it.startUtcMs && now < it.endUtcMs },
+            next = programmes.firstOrNull { it.startUtcMs > now },
+        )
+    }
+
 }

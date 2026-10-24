@@ -57,8 +57,8 @@ fun SunsetHeroBillboard(
     val isTv = LocalIsTelevision.current
     // A short hero (small 720p/1080p TV viewports) drops lines instead of overflowing above the
     // billboard, which used to push the title under the top navigation bar.
-    val ultraCompact = isTv && height < 300.dp
-    val compact = isTv && height < 340.dp
+    val ultraCompact = isTv && height < 330.dp
+    val compact = isTv && height < 370.dp
     val titleLines = when {
         !isTv -> 2
         height >= 440.dp -> 3

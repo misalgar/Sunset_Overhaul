@@ -107,8 +107,10 @@ fun HomeScreen(
             148.dp
         }
         // Keep the hero cinematic but leave room for the first rail on short TV viewports.
+        // The hero content (two-line display title, meta, CTAs) needs ~300 dp; anything shorter
+        // clips the title at the top of the billboard.
         val heroHeight = if (isTv) {
-            (maxHeight * 0.48f).coerceIn(280.dp, 340.dp)
+            (maxHeight * 0.52f).coerceIn(320.dp, 380.dp)
         } else {
             400.dp
         }

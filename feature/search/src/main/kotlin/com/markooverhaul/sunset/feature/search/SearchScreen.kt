@@ -55,6 +55,7 @@ import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelRow
 import com.markooverhaul.sunset.core.ui.components.SunsetContentRow
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
+import com.markooverhaul.sunset.core.ui.components.LocalDemoMode
 import com.markooverhaul.sunset.core.ui.components.SunsetPosterCard
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
 
@@ -367,7 +368,10 @@ fun SearchScreen(
                         item(key = "prompt") {
                             SunsetEmptyState(
                                 title = stringResource(R.string.search_empty_title),
-                                body = stringResource(R.string.search_empty_body),
+                            body = stringResource(
+                                if (LocalDemoMode.current) R.string.search_empty_body_demo
+                                else R.string.search_empty_body_live,
+                            ),
                             )
                         }
                     }

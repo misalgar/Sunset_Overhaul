@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-  Debug override: the Xtream panel redirects live streams to a separate streaming host that is
-  published as a raw IP and changes between sessions, so the release host allowlist cannot cover
-  it. Debug builds therefore permit cleartext; release keeps the scoped policy in src/main.
--->
-<network-security-config>
-    <base-config cleartextTrafficPermitted="true" />
-</network-security-config>

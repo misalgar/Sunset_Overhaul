@@ -25,13 +25,20 @@ abstract class GenerateNetworkSecurityConfig : DefaultTask() {
     @get:Input
     abstract val providerHost: Property<String>
 
+    @get:Input
+    abstract val allowAllCleartext: Property<Boolean>
+
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
     @TaskAction
     fun generate() {
         val host = providerHost.get().trim()
-        val domainBlock = if (host.isEmpty()) {
+        if (host.isNotEmpty() && !host.matches(Regex("[A-Za-z0-9.-]+"))) {
+            throw GradleException("sunset.provider.host must be a hostname or IP address")
+        }
+        val baseConfig = allowAllCleartext.get()
+        val domainBlock = if (host.isEmpty() || baseConfig) {
             ""
         } else {
             """
@@ -46,7 +53,7 @@ abstract class GenerateNetworkSecurityConfig : DefaultTask() {
             |<?xml version="1.0" encoding="utf-8"?>
             |<!-- Generated at build time from local.properties; do not edit. -->
             |<network-security-config>
-            |    <base-config cleartextTrafficPermitted="false" />
+            |    <base-config cleartextTrafficPermitted="$baseConfig" />
             |$domainBlock
             |</network-security-config>
             |
@@ -55,17 +62,16 @@ abstract class GenerateNetworkSecurityConfig : DefaultTask() {
     }
 }
 
-val generateNetworkSecurityConfig = tasks.register<GenerateNetworkSecurityConfig>(
-    "generateNetworkSecurityConfig",
-) {
-    providerHost.set(providerHostValue)
-    outputDir.set(layout.buildDirectory.dir("generated/res/networkSecurityConfig"))
-}
-
 androidComponents {
     onVariants { variant ->
+        val taskName = "generate${variant.name.replaceFirstChar { it.uppercase() }}NetworkSecurityConfig"
+        val generateConfig = tasks.register<GenerateNetworkSecurityConfig>(taskName) {
+            providerHost.set(providerHostValue)
+            allowAllCleartext.set(variant.buildType == "debug")
+            outputDir.set(layout.buildDirectory.dir("generated/res/networkSecurityConfig/${variant.name}"))
+        }
         variant.sources.res?.addGeneratedSourceDirectory(
-            generateNetworkSecurityConfig,
+            generateConfig,
             GenerateNetworkSecurityConfig::outputDir,
         )
     }
@@ -172,4 +178,3 @@ dependencies {
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.espresso)
 }
-
