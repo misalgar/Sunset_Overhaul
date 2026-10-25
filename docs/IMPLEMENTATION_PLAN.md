@@ -368,11 +368,20 @@ field and reopened the IME.
   launcher.
 - An IME visibility effect also clears edit mode when the keyboard transitions from visible to
   hidden, covering the case where the system IME consumes Back.
-- The field also clears edit mode when it loses focus (the observed focus move to the top nav).
+- Field focus loss during an edit session (excluding the one at edit start) schedules a refocus of
+  the launcher. The navigation also restores focus after Back, so the refocus keeps asking until
+  the box has held focus for two consecutive checks instead of stopping at the first success.
+- Up/Down/Submit clear the edit session before moving, so leaving the field never triggers the
+  refocus. Down only leaves the field when it has a result/recent group to enter.
 - The text field remains non-focusable unless `editing` is true; the launcher is the D-pad target,
   so only an explicit Select opens the keyboard again.
 
-Next: catch-up playback, release binding, phone/tablet pass.
+Verified on the Fire TV, with an empty and a typed query: Select opens the IME, Back closes it and
+leaves the amber focus ring on the search box, Up still reaches the top navigation, Down returns to
+the box without reopening the IME, and Select reopens it. Submitting from the keyboard still moves
+focus into the first result group.
+
+Next: Live TV master-detail overhaul, catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification
 

@@ -132,17 +132,26 @@ fun SearchScreen(
     var editing by remember { mutableStateOf(!isTv) }
     var launcherFocused by remember { mutableStateOf(false) }
     var wasImeVisible by remember { mutableStateOf(false) }
+    var wasEditing by remember { mutableStateOf(false) }
+    var returnFocusToLauncher by remember { mutableStateOf(false) }
+    var editStartedAt by remember { mutableStateOf(0L) }
     val imeVisible = WindowInsets.isImeVisible
     val searchShape = RoundedCornerShape(SunsetRadius.Sm)
 
-    // Back dismisses the TV keyboard but does not change `editing` by itself. Treat the IME
-    // disappearing as leaving edit mode so focusing the search box again cannot reopen it.
+    // Back dismisses the TV keyboard but does not change `editing` by itself. When the IME hides
+    // after an edit session (and the viewer did not navigate away with Up/Down/Submit), return
+    // focus to the search launcher so the box stays selected without reopening the keyboard.
     LaunchedEffect(imeVisible) {
         if (imeVisible) {
             wasImeVisible = true
         } else if (wasImeVisible) {
             wasImeVisible = false
-            if (editing) {
+            if (wasEditing) {
+                wasEditing = false
+                editing = false
+                keyboardController?.hide()
+                returnFocusToLauncher = true
+            } else if (editing) {
                 editing = false
                 keyboardController?.hide()
             }
@@ -150,9 +159,28 @@ fun SearchScreen(
     }
 
     BackHandler(enabled = isTv && editing) {
+        wasEditing = false
         editing = false
         keyboardController?.hide()
-        runCatching { launcherFocusRequester.requestFocus() }
+        returnFocusToLauncher = true
+    }
+
+    LaunchedEffect(returnFocusToLauncher) {
+        if (!returnFocusToLauncher) return@LaunchedEffect
+        returnFocusToLauncher = false
+        // The navigation also restores focus after Back, so keep asking for the search box and
+        // only stop once it has held focus for two consecutive checks.
+        var stableChecks = 0
+        repeat(10) {
+            if (launcherFocused) {
+                stableChecks++
+                if (stableChecks >= 2) return@LaunchedEffect
+            } else {
+                stableChecks = 0
+                runCatching { launcherFocusRequester.requestFocus() }
+            }
+            delay(120)
+        }
     }
 
     val results = state.results
@@ -183,6 +211,7 @@ fun SearchScreen(
     // remote can reach the results. Previously focus stayed in the field and the IME reopened.
     val submitAndShowResults: () -> Unit = {
         onSubmit()
+        wasEditing = false
         keyboardController?.hide()
         if (state.query.trim().length >= SearchUiState.MIN_QUERY_LENGTH) {
             pendingResultsFocus = true
@@ -211,6 +240,8 @@ fun SearchScreen(
     // Entering edit mode is the only path that shows the IME on TV.
     LaunchedEffect(editing) {
         if (!isTv || !editing) return@LaunchedEffect
+        wasEditing = true
+        editStartedAt = System.currentTimeMillis()
         withFrameNanos { }
         withFrameNanos { }
         runCatching { fieldFocusRequester.requestFocus() }
@@ -265,7 +296,20 @@ fun SearchScreen(
                             if (isTv) {
                                 Modifier
                                     .focusRequester(launcherFocusRequester)
-                                    .onFocusChanged { launcherFocused = it.isFocused }
+                                    .onFocusChanged {
+                                        launcherFocused = it.isFocused
+                                        // If the IME (or the system Back) drops the box before the
+                                        // field ever reports focus loss, pull focus back here once
+                                        // the navigation's own focus restoration has settled.
+                                        if (!it.isFocused &&
+                                            wasEditing &&
+                                            System.currentTimeMillis() - editStartedAt > 400L
+                                        ) {
+                                            wasEditing = false
+                                            editing = false
+                                            returnFocusToLauncher = true
+                                        }
+                                    }
                                     .sunsetFocusRing(launcherFocused, searchShape)
                                     .onPreviewKeyEvent { event ->
                                         if (event.type != KeyEventType.KeyDown) {
@@ -322,25 +366,43 @@ fun SearchScreen(
                                     // traversal never triggers the IME.
                                     .focusProperties { canFocus = editing }
                                     .onFocusChanged {
-                                        // Back moves focus to the top navigation; leaving edit mode
-                                        // here keeps a later D-pad visit from reopening the IME.
-                                        if (!it.isFocused && editing) {
+                                        // Back moves focus to the top navigation. If this was not an
+                                        // intentional Up/Down/Submit, return focus to the search
+                                        // launcher after the navigation settles.
+                                        if (!it.isFocused && wasEditing) {
+                                            wasEditing = false
                                             editing = false
+                                            returnFocusToLauncher = true
                                         }
                                     }
                                     .onPreviewKeyEvent { event ->
-                                        // With the IME dismissed, Down must move into the results
-                                        // rather than wrapping back to the field (the old trap).
-                                        if (event.type == KeyEventType.KeyDown &&
-                                            event.key == Key.DirectionDown &&
-                                            focusGroup != null
-                                        ) {
-                                            editing = false
-                                            keyboardController?.hide()
-                                            runCatching { resultsFocusRequester.requestFocus() }
-                                            true
-                                        } else {
+                                        if (event.type != KeyEventType.KeyDown) {
                                             false
+                                        } else {
+                                            when (event.key) {
+                                                Key.DirectionDown -> {
+                                                    if (focusGroup == null) {
+                                                        false
+                                                    } else {
+                                                        wasEditing = false
+                                                        editing = false
+                                                        keyboardController?.hide()
+                                                        runCatching {
+                                                            resultsFocusRequester.requestFocus()
+                                                        }
+                                                        true
+                                                    }
+                                                }
+
+                                                Key.DirectionUp -> {
+                                                    wasEditing = false
+                                                    editing = false
+                                                    keyboardController?.hide()
+                                                    false
+                                                }
+
+                                                else -> false
+                                            }
                                         }
                                     }
                             } else {
