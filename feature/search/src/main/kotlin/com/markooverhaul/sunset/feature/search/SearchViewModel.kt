@@ -23,11 +23,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+enum class SearchFilter { All, Live, Movies, Series }
+
 data class SearchUiState(
     val query: String = "",
     val results: SearchResults? = null,
     val recent: List<RecentSearch> = emptyList(),
     val favouriteIds: Set<String> = emptySet(),
+    val filter: SearchFilter = SearchFilter.All,
     val isSearching: Boolean = false,
     val error: Throwable? = null,
 ) {
@@ -105,6 +108,10 @@ class SearchViewModel @Inject constructor(
 
     fun clearRecent() {
         viewModelScope.launch { searchHistoryRepository.clear() }
+    }
+
+    fun setFilter(filter: SearchFilter) {
+        _state.update { it.copy(filter = filter) }
     }
 
     fun toggleChannelFavourite(channel: LiveChannel) {

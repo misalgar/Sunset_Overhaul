@@ -321,8 +321,30 @@ to the rail above, and vertical movement no longer gets stuck or jumps to Play.
   backdrop still gets artwork instead of a gradient monogram.
 - Continue Watching resolves the catalogue backdrop (or poster) for each progress entry and carries
   it as a non-persisted `WatchProgress.artworkUrl`, so the landscape cards show real artwork.
-- Verified on the Fire TV: the hero shows the recent movie’s image and the South Park progress card
+- Verified on the Fire TV: the hero shows the recent movie's image and the South Park progress card
   shows the series artwork.
+
+### 5.15 Small polish pass (2026-10-24)
+
+- **TMDB recommendation cache.** Resolved recommendation IDs are stored in the existing disk cache
+  for 24 hours, so reopening a detail does not re-query TMDB. If TMDB recommendations don’t resolve
+  to local titles, the provider falls back to same-genre catalogue titles so the rail still contains
+  playable cards.
+- **Episode stills verified.** Pulling the Room database after opening *Fear the Walking Dead*
+  showed TMDB still URLs for 37 episodes, confirming the background season enrichment.
+- **Live 403 copy.** A 403 on a live stream now says “This channel isn’t available right now…” with
+  guidance to try another channel, instead of incorrectly asking the viewer to sign in again. VOD
+  and series 403s keep the authorization copy.
+- **Search.** Added All / Live / Movies / Series filters, kept recent-query chips and clear-all, and
+  replaced `contains` matching with a fuzzy scorer: accent/punctuation-insensitive, token order
+  independent, compact word-boundary matching and one-character typo tolerance. Candidate retrieval
+  uses title-ordered `LIKE` queries so fuzzy matches are not lost behind “recently added” limits.
+  Verified with `deapool` → Deadpool, Deadpool 2 and Deadpool and Wolverine.
+- **Home.** Added a “Because you watched …” rail anchored to the most recent progress entry. It uses
+  cached TMDB recommendations and falls back to genre matches when needed.
+
+Verified on the Fire TV: fuzzy search results and filters, the Because rail, the live 403 text and
+the cached recommendation path.
 
 Next: catch-up playback, release binding, phone/tablet pass.
 

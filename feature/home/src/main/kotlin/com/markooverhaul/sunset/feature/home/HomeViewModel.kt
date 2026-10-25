@@ -30,6 +30,15 @@ data class ChannelNowNext(
     val next: EpgProgramme? = null,
 )
 
+data class HomeRailItem(
+    val id: String,
+    val type: ContentType,
+    val title: String,
+    val posterUrl: String?,
+    val year: Int?,
+    val subtitle: String?,
+)
+
 data class HomeUiState(
     val isLoading: Boolean = true,
     val hero: Movie? = null,
@@ -40,6 +49,8 @@ data class HomeUiState(
     val continueWatching: List<WatchProgress> = emptyList(),
     val favouriteIds: Set<String> = emptySet(),
     val nowNext: Map<String, ChannelNowNext> = emptyMap(),
+    val becauseTitle: String? = null,
+    val becauseItems: List<HomeRailItem> = emptyList(),
     val error: Throwable? = null,
 ) {
     val isEmpty: Boolean
@@ -59,6 +70,8 @@ class HomeViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     private var loadJob: Job? = null
+    private var becauseJob: Job? = null
+    private var becauseAnchorId: String? = null
 
     init {
         viewModelScope.launch {
@@ -84,6 +97,7 @@ class HomeViewModel @Inject constructor(
                     }
                 }
                 _state.update { it.copy(continueWatching = enriched) }
+                enriched.firstOrNull()?.let(::loadBecauseYouWatched)
             }
         }
         viewModelScope.launch {
@@ -133,6 +147,7 @@ class HomeViewModel @Inject constructor(
                                     .take(12),
                             )
                         }
+                        _state.value.continueWatching.firstOrNull()?.let(::loadBecauseYouWatched)
                     }
 
                     launch {
@@ -144,6 +159,50 @@ class HomeViewModel @Inject constructor(
                 throw cancelled
             } catch (error: Throwable) {
                 _state.update { it.copy(isLoading = false, error = error) }
+            }
+        }
+    }
+
+    private fun loadBecauseYouWatched(progress: WatchProgress) {
+        if (becauseAnchorId == progress.contentId) return
+        becauseAnchorId = progress.contentId
+        becauseJob?.cancel()
+        becauseJob = viewModelScope.launch {
+            val items = withContext(ioDispatcher) {
+                when (progress.contentType) {
+                    ContentType.MOVIE -> provider.getMovieRecommendations(progress.contentId)
+                        .map { movie ->
+                            HomeRailItem(
+                                id = movie.id,
+                                type = ContentType.MOVIE,
+                                title = movie.title,
+                                posterUrl = movie.posterUrl,
+                                year = movie.year,
+                                subtitle = movie.genres.firstOrNull(),
+                            )
+                        }
+
+                    ContentType.SERIES, ContentType.EPISODE ->
+                        provider.getSeriesRecommendations(progress.contentId)
+                            .map { series ->
+                                HomeRailItem(
+                                    id = series.id,
+                                    type = ContentType.SERIES,
+                                    title = series.title,
+                                    posterUrl = series.posterUrl,
+                                    year = series.year,
+                                    subtitle = series.genres.firstOrNull(),
+                                )
+                            }
+
+                    ContentType.LIVE -> emptyList()
+                }
+            }
+            _state.update {
+                it.copy(
+                    becauseTitle = progress.title,
+                    becauseItems = items,
+                )
             }
         }
     }

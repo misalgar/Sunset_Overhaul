@@ -42,6 +42,38 @@ interface CatalogueDao {
     )
     suspend fun moviesPage(categoryId: String, limit: Int, offset: Int): List<CatalogueMovieEntity>
 
+    @Query(
+        "SELECT * FROM catalogue_movies WHERE title LIKE '%' || :term || '%' " +
+            "ORDER BY title LIMIT :limit",
+    )
+    suspend fun searchMoviesByTitle(term: String, limit: Int): List<CatalogueMovieEntity>
+
+    @Query(
+        "SELECT * FROM catalogue_series WHERE title LIKE '%' || :term || '%' " +
+            "ORDER BY title LIMIT :limit",
+    )
+    suspend fun searchSeriesByTitle(term: String, limit: Int): List<CatalogueSeriesEntity>
+
+    @Query(
+        "SELECT * FROM catalogue_movies WHERE id != :excludeId AND genres LIKE '%' || :genre || '%' " +
+            "ORDER BY addedAtUtcMs DESC, title LIMIT :limit",
+    )
+    suspend fun moviesByGenre(
+        genre: String,
+        excludeId: String,
+        limit: Int,
+    ): List<CatalogueMovieEntity>
+
+    @Query(
+        "SELECT * FROM catalogue_series WHERE id != :excludeId AND genres LIKE '%' || :genre || '%' " +
+            "ORDER BY addedAtUtcMs DESC, title LIMIT :limit",
+    )
+    suspend fun seriesByGenre(
+        genre: String,
+        excludeId: String,
+        limit: Int,
+    ): List<CatalogueSeriesEntity>
+
     @Query("SELECT * FROM catalogue_movies WHERE id = :id LIMIT 1")
     suspend fun movie(id: String): CatalogueMovieEntity?
 

@@ -4,6 +4,7 @@ import com.markooverhaul.sunset.core.database.CatalogueDao
 import com.markooverhaul.sunset.core.database.CatalogueEpisodeEntity
 import com.markooverhaul.sunset.core.database.CatalogueMovieEntity
 import com.markooverhaul.sunset.core.database.CatalogueSeriesEntity
+import com.markooverhaul.sunset.core.network.xtream.XtreamCache
 import java.text.Normalizer
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -20,6 +21,7 @@ import javax.inject.Singleton
 class TmdbEnricher @Inject constructor(
     private val api: TmdbApi,
     private val dao: CatalogueDao,
+    private val cache: XtreamCache,
 ) {
     val isConfigured: Boolean get() = api.isConfigured
 
@@ -146,6 +148,18 @@ class TmdbEnricher @Inject constructor(
         limit: Int = 12,
     ): List<CatalogueMovieEntity> {
         val tmdbId = entity.tmdbId?.toLongOrNull() ?: return emptyList()
+        val cacheKey = "recs_movie_$tmdbId"
+        val cachedIds = cache.read(cacheKey, maxAgeMs = RECS_TTL_MS)
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+        if (cachedIds.isNotEmpty()) {
+            val cached = cachedIds
+                .mapNotNull { dao.movie(it) }
+                .filter { it.id != entity.id }
+            if (cached.isNotEmpty()) return cached.take(limit)
+        }
         val results = api.movieRecommendations(tmdbId)
         if (results.isEmpty()) return emptyList()
         val seen = mutableSetOf(entity.id)
@@ -168,6 +182,9 @@ class TmdbEnricher @Inject constructor(
             resolved += match
             if (resolved.size >= limit) break
         }
+        if (resolved.isNotEmpty()) {
+            cache.write(cacheKey, resolved.joinToString(",") { it.id })
+        }
         return resolved
     }
 
@@ -176,6 +193,18 @@ class TmdbEnricher @Inject constructor(
         limit: Int = 12,
     ): List<CatalogueSeriesEntity> {
         val tmdbId = entity.tmdbId?.toLongOrNull() ?: return emptyList()
+        val cacheKey = "recs_series_$tmdbId"
+        val cachedIds = cache.read(cacheKey, maxAgeMs = RECS_TTL_MS)
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+        if (cachedIds.isNotEmpty()) {
+            val cached = cachedIds
+                .mapNotNull { dao.series(it) }
+                .filter { it.id != entity.id }
+            if (cached.isNotEmpty()) return cached.take(limit)
+        }
         val results = api.seriesRecommendations(tmdbId)
         if (results.isEmpty()) return emptyList()
         val seen = mutableSetOf(entity.id)
@@ -197,6 +226,9 @@ class TmdbEnricher @Inject constructor(
             seen += match.id
             resolved += match
             if (resolved.size >= limit) break
+        }
+        if (resolved.isNotEmpty()) {
+            cache.write(cacheKey, resolved.joinToString(",") { it.id })
         }
         return resolved
     }
@@ -275,6 +307,7 @@ class TmdbEnricher @Inject constructor(
 
     private companion object {
         const val MATCH_TTL_MS = 30L * 24 * 60 * 60 * 1000
+        const val RECS_TTL_MS = 24L * 60 * 60 * 1000
         const val MATCHER_VERSION = 2
         val STOP_WORDS = setOf(
             "and", "the", "of", "a", "an", "y", "e", "de", "del", "la", "el",

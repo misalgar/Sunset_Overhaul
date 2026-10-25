@@ -93,6 +93,7 @@ fun SearchRoute(
         onSubmit = viewModel::submit,
         onClearQuery = viewModel::clearQuery,
         onClearRecent = viewModel::clearRecent,
+        onSelectFilter = viewModel::setFilter,
         onToggleFavourite = viewModel::toggleChannelFavourite,
         onOpenDetails = onOpenDetails,
         onPlayChannel = onPlayChannel,
@@ -107,6 +108,7 @@ fun SearchScreen(
     onSubmit: () -> Unit,
     onClearQuery: () -> Unit,
     onClearRecent: () -> Unit,
+    onSelectFilter: (SearchFilter) -> Unit,
     onToggleFavourite: (LiveChannel) -> Unit,
     onOpenDetails: (ContentType, String) -> Unit,
     onPlayChannel: (LiveChannel) -> Unit,
@@ -127,11 +129,26 @@ fun SearchScreen(
     val searchShape = RoundedCornerShape(SunsetRadius.Sm)
 
     val results = state.results
+    val liveResults = if (state.filter == SearchFilter.All || state.filter == SearchFilter.Live) {
+        results?.live.orEmpty()
+    } else {
+        emptyList()
+    }
+    val movieResults = if (state.filter == SearchFilter.All || state.filter == SearchFilter.Movies) {
+        results?.movies.orEmpty()
+    } else {
+        emptyList()
+    }
+    val seriesResults = if (state.filter == SearchFilter.All || state.filter == SearchFilter.Series) {
+        results?.series.orEmpty()
+    } else {
+        emptyList()
+    }
     val focusGroup = when {
         state.showPrompt && state.recent.isNotEmpty() -> SearchFocusGroup.Recent
-        results != null && results.live.isNotEmpty() -> SearchFocusGroup.Live
-        results != null && results.movies.isNotEmpty() -> SearchFocusGroup.Movies
-        results != null && results.series.isNotEmpty() -> SearchFocusGroup.Series
+        results != null && liveResults.isNotEmpty() -> SearchFocusGroup.Live
+        results != null && movieResults.isNotEmpty() -> SearchFocusGroup.Movies
+        results != null && seriesResults.isNotEmpty() -> SearchFocusGroup.Series
         else -> null
     }
 
@@ -378,7 +395,37 @@ fun SearchScreen(
                 }
 
                 if (!state.showPrompt && results != null) {
-                    if (results.isEmpty) {
+                    item(key = "filters") {
+                        val filters = listOf(
+                            SearchFilter.All,
+                            SearchFilter.Live,
+                            SearchFilter.Movies,
+                            SearchFilter.Series,
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = gutter),
+                        ) {
+                            itemsIndexed(filters, key = { _, filter -> filter.name }) { _, filter ->
+                                CategoryChip(
+                                    text = stringResource(
+                                        when (filter) {
+                                            SearchFilter.All -> R.string.search_filter_all
+                                            SearchFilter.Live -> R.string.content_type_live
+                                            SearchFilter.Movies -> R.string.nav_movies
+                                            SearchFilter.Series -> R.string.nav_series
+                                        },
+                                    ),
+                                    selected = state.filter == filter,
+                                    onClick = { onSelectFilter(filter) },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (!state.showPrompt && results != null) {
+                    if (liveResults.isEmpty() && movieResults.isEmpty() && seriesResults.isEmpty()) {
                         item(key = "no-results") {
                             SunsetEmptyState(
                                 title = stringResource(R.string.search_no_results_title, state.query.trim()),
@@ -386,14 +433,14 @@ fun SearchScreen(
                             )
                         }
                     } else {
-                        if (results.live.isNotEmpty()) {
+                        if (liveResults.isNotEmpty()) {
                             item(key = "live-header") {
                                 SunsetSectionHeader(
-                                    title = stringResource(R.string.search_group_live, results.live.size),
+                                    title = stringResource(R.string.search_group_live, liveResults.size),
                                     modifier = Modifier.padding(horizontal = gutter),
                                 )
                             }
-                            itemsIndexed(results.live, key = { _, channel -> "live-${channel.id}" }) { index, channel ->
+                            itemsIndexed(liveResults, key = { _, channel -> "live-${channel.id}" }) { index, channel ->
                                 SunsetChannelRow(
                                     channel = channel,
                                     nowTitle = null,
@@ -417,11 +464,11 @@ fun SearchScreen(
                             }
                         }
 
-                        if (results.movies.isNotEmpty()) {
+                        if (movieResults.isNotEmpty()) {
                             item(key = "movies") {
                                 SunsetContentRow(
-                                    title = stringResource(R.string.search_group_movies, results.movies.size),
-                                    items = results.movies,
+                                    title = stringResource(R.string.search_group_movies, movieResults.size),
+                                    items = movieResults,
                                     key = { it.id },
                                     gutter = gutter,
                                 ) { movie, itemModifier ->
@@ -434,7 +481,7 @@ fun SearchScreen(
                                         modifier = itemModifier.then(
                                             if (
                                                 focusGroup == SearchFocusGroup.Movies &&
-                                                movie.id == results.movies.first().id
+                                                movie.id == movieResults.first().id
                                             ) {
                                                 Modifier.focusRequester(resultsFocusRequester)
                                             } else {
@@ -447,11 +494,11 @@ fun SearchScreen(
                             }
                         }
 
-                        if (results.series.isNotEmpty()) {
+                        if (seriesResults.isNotEmpty()) {
                             item(key = "series") {
                                 SunsetContentRow(
-                                    title = stringResource(R.string.search_group_series, results.series.size),
-                                    items = results.series,
+                                    title = stringResource(R.string.search_group_series, seriesResults.size),
+                                    items = seriesResults,
                                     key = { it.id },
                                     gutter = gutter,
                                 ) { series, itemModifier ->
@@ -464,7 +511,7 @@ fun SearchScreen(
                                         modifier = itemModifier.then(
                                             if (
                                                 focusGroup == SearchFocusGroup.Series &&
-                                                series.id == results.series.first().id
+                                                series.id == seriesResults.first().id
                                             ) {
                                                 Modifier.focusRequester(resultsFocusRequester)
                                             } else {

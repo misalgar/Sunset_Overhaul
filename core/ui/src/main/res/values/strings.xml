@@ -112,6 +112,7 @@
     <string name="home_eyebrow_series">SERIES · NEW EPISODE</string>
     <string name="home_eyebrow_continue">CONTINUE WATCHING</string>
     <string name="home_row_continue">Continue Watching</string>
+    <string name="home_row_because">Because you watched %1$s</string>
     <string name="home_row_live_now">Live Now</string>
     <string name="home_row_recommended">Recommended for you</string>
     <string name="home_row_new_on_sunset">New on Sunset</string>
@@ -201,6 +202,7 @@
     <string name="search_placeholder">Search live TV, movies and series…</string>
     <string name="search_clear">Clear search</string>
     <string name="search_recent">Recent searches</string>
+    <string name="search_filter_all">All</string>
     <string name="search_results_for">Results for “%1$s”</string>
     <string name="search_group_live">Live TV (%1$d)</string>
     <string name="search_group_movies">Movies (%1$d)</string>
@@ -326,6 +328,7 @@
     <string name="error_maintenance">Sunset is being updated. Please try again shortly.</string>
     <string name="error_rate_limited">Too many requests. Please wait a moment and try again.</string>
     <string name="error_playback_auth">Playback authorization failed. Sign in again.</string>
+    <string name="error_channel_unavailable">This channel isn’t available right now. It may be offline or not included in your plan. Try another channel.</string>
     <string name="error_playback_unsupported">This stream is not supported on this device.</string>
     <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="common_unknown_error">Something went wrong.</string>

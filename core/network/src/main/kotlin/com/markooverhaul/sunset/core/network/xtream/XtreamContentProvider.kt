@@ -302,14 +302,22 @@ class XtreamContentProvider @Inject constructor(
         ensureCatalogue()
         var entity = catalogueDao.movie(id) ?: return emptyList()
         entity = enrichMovie(entity)
-        return tmdb.movieRecommendations(entity).map { it.toDomain() }
+        val tmdbItems = tmdb.movieRecommendations(entity).map { it.toDomain() }
+        if (tmdbItems.isNotEmpty()) return tmdbItems
+        val genre = entity.genres.split(',').map { it.trim() }.firstOrNull { it.isNotBlank() }
+            ?: return emptyList()
+        return catalogueDao.moviesByGenre(genre, entity.id, 12).map { it.toDomain() }
     }
 
     override suspend fun getSeriesRecommendations(id: String): List<SeriesSummary> {
         ensureCatalogue()
         var entity = catalogueDao.series(id) ?: return emptyList()
         entity = enrichSeries(entity)
-        return tmdb.seriesRecommendations(entity).map { it.toSummary() }
+        val tmdbItems = tmdb.seriesRecommendations(entity).map { it.toSummary() }
+        if (tmdbItems.isNotEmpty()) return tmdbItems
+        val genre = entity.genres.split(',').map { it.trim() }.firstOrNull { it.isNotBlank() }
+            ?: return emptyList()
+        return catalogueDao.seriesByGenre(genre, entity.id, 12).map { it.toSummary() }
     }
 
     override suspend fun search(query: String): SearchResults {
@@ -318,15 +326,129 @@ class XtreamContentProvider @Inject constructor(
         ensureCatalogue()
         val liveMatches = mutex.withLock {
             val all = channels ?: loadChannels()
-            all.filter { it.name.contains(term, ignoreCase = true) }
+            all.map { channel -> channel to fuzzyScore(channel.name, term) }
+                .filter { it.second > 0 }
+                .sortedByDescending { it.second }
+                .map { it.first }
+                .take(MAX_RESULTS)
         }
-        val movieMatches = catalogueDao.searchMovies(term, MAX_RESULTS).map { it.toDomain() }
-        val seriesMatches = catalogueDao.searchSeries(term, MAX_RESULTS).map { it.toSummary() }
+        val movieMatches = searchMoviesFuzzy(term)
+        val seriesMatches = searchSeriesFuzzy(term)
         return SearchResults(
-            live = liveMatches.take(MAX_RESULTS),
+            live = liveMatches,
             movies = movieMatches,
             series = seriesMatches,
         )
+    }
+
+    private suspend fun searchMoviesFuzzy(query: String): List<Movie> {
+        val candidates = searchCandidates(query)
+            .flatMap { candidate -> catalogueDao.searchMoviesByTitle(candidate, 600) }
+            .distinctBy { it.id }
+        return candidates
+            .map { movie -> movie to fuzzyScore(movie.title, query) }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .map { it.first.toDomain() }
+            .take(MAX_RESULTS)
+    }
+
+    private suspend fun searchSeriesFuzzy(query: String): List<SeriesSummary> {
+        val candidates = searchCandidates(query)
+            .flatMap { candidate -> catalogueDao.searchSeriesByTitle(candidate, 600) }
+            .distinctBy { it.id }
+        return candidates
+            .map { series -> series to fuzzyScore(series.title, query) }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .map { it.first.toSummary() }
+            .take(MAX_RESULTS)
+    }
+
+    /** SQL `LIKE` is only a candidate filter; the fuzzy score below does the real ranking. */
+    private fun searchCandidates(query: String): List<String> {
+        val tokens = query.trim()
+            .split(Regex("""\s+"""))
+            .filter { it.length >= 2 }
+            .take(3)
+        val prefixes = tokens
+            .filter { it.length >= 4 }
+            .map { it.take(3) }
+        return (listOf(query) + tokens + prefixes)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(5)
+    }
+
+    /**
+     * Exact/prefix/substring first, then token and typo matching. Returns 0 when no token matches,
+     * so a typo in the middle of a word still matches ("deapool" -> "Deadpool").
+     */
+    private fun fuzzyScore(title: String, query: String): Int {
+        val titleNorm = normalizeSearch(title)
+        val queryNorm = normalizeSearch(query)
+        if (titleNorm.isBlank() || queryNorm.isBlank()) return 0
+        if (titleNorm == queryNorm) return 1000
+        if (titleNorm.startsWith("$queryNorm ")) return 850
+        if (titleNorm.contains(queryNorm)) return 700
+
+        val titleCompact = titleNorm.replace(" ", "")
+        val queryCompact = queryNorm.replace(" ", "")
+        if (titleCompact == queryCompact) return 900
+        if (titleCompact.contains(queryCompact)) return 520
+        if (queryCompact.length >= 5 && levenshtein(titleCompact, queryCompact) <= 1) {
+            return 450
+        }
+
+        val titleTokens = titleNorm.split(' ').filter { it.isNotBlank() }
+        val queryTokens = queryNorm.split(' ').filter { it.isNotBlank() }
+        var total = 0
+        for (queryToken in queryTokens) {
+            val best = titleTokens.maxOfOrNull { titleToken ->
+                when {
+                    titleToken == queryToken -> 120
+                    titleToken.startsWith(queryToken) -> 90
+                    queryToken.length >= 4 &&
+                        levenshtein(titleToken, queryToken) <= 1 -> 60
+                    else -> 0
+                }
+            } ?: 0
+            if (best == 0) return 0
+            total += best
+        }
+        return total
+    }
+
+    private fun normalizeSearch(value: String): String =
+        java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+            .replace(Regex("""\p{M}+"""), "")
+            .lowercase(Locale.US)
+            .replace(Regex("""[^a-z0-9]+"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+
+    private fun levenshtein(a: String, b: String): Int {
+        if (a == b) return 0
+        if (a.isEmpty()) return b.length
+        if (b.isEmpty()) return a.length
+        var previous = IntArray(b.length + 1) { it }
+        var current = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            current[0] = i
+            for (j in 1..b.length) {
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+                current[j] = minOf(
+                    current[j - 1] + 1,
+                    previous[j] + 1,
+                    previous[j - 1] + cost,
+                )
+            }
+            val swap = previous
+            previous = current
+            current = swap
+        }
+        return previous[b.length]
     }
 
     override suspend fun resolveStream(request: StreamRequest): StreamSource {

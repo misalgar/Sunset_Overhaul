@@ -205,6 +205,7 @@ fun PlayerScreen(
                     stringResource(R.string.player_error_body)
                 },
                 failure = playback.error,
+                live = state.live,
                 onRetry = onRetry,
                 onExit = onExit,
             )
@@ -456,6 +457,7 @@ private fun PlayerControlButton(
 private fun PlayerErrorOverlay(
     message: String,
     failure: PlaybackFailure?,
+    live: Boolean,
     onRetry: () -> Unit,
     onExit: () -> Unit,
 ) {
@@ -487,7 +489,11 @@ private fun PlayerErrorOverlay(
                     text = stringResource(
                         when (failure) {
                             PlaybackFailure.NETWORK -> R.string.error_network_body
-                            PlaybackFailure.AUTH -> R.string.error_playback_auth
+                            PlaybackFailure.AUTH -> if (live) {
+                                R.string.error_channel_unavailable
+                            } else {
+                                R.string.error_playback_auth
+                            }
                             PlaybackFailure.UNSUPPORTED_FORMAT -> R.string.error_playback_unsupported
                             PlaybackFailure.DECODER -> R.string.error_playback_unsupported
                             PlaybackFailure.SERVER -> R.string.error_generic_body

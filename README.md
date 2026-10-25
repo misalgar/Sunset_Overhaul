@@ -29,6 +29,10 @@ stream URL is stored in the repository; release builds still bind the fail-close
 | Optional TMDB enrichment (details, artwork, episode stills) | Complete; requires a key in `local.properties` |
 | Dedicated PPV destination with a 15-minute live schedule refresh | Complete |
 | TMDB “More like this” rails resolved to playable local titles | Complete |
+| TMDB recommendation cache (24 h) and genre fallback | Complete |
+| Search filters, recent queries and fuzzy matching | Complete |
+| “Because you watched…” Home rail | Complete |
+| Live-channel 403 copy | Complete |
 
 Builds, lint and JVM tests were verified on 2026-10-23; see [Verification](#verification) and
 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for exact commands and results. Manual

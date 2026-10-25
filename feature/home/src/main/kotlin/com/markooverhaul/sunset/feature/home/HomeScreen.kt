@@ -140,6 +140,7 @@ fun HomeScreen(
             mapOf(
                 "continue" to FocusRequester(),
                 "live" to FocusRequester(),
+                "because" to FocusRequester(),
                 "discovery" to FocusRequester(),
                 "recentMovies" to FocusRequester(),
                 "recentSeries" to FocusRequester(),
@@ -152,6 +153,7 @@ fun HomeScreen(
         val visibleRowKeys = buildList {
             if (state.continueWatching.isNotEmpty()) add("continue")
             if (state.liveNow.isNotEmpty()) add("live")
+            if (state.becauseItems.isNotEmpty()) add("because")
             if (discovery.isNotEmpty()) add("discovery")
             if (state.recentMovies.isNotEmpty()) add("recentMovies")
             if (state.recentSeries.isNotEmpty()) add("recentSeries")
@@ -342,6 +344,31 @@ fun HomeScreen(
                                 },
                                 width = if (isTv) 240.dp else 220.dp,
                                 modifier = itemFocusModifier("live", modifier),
+                            )
+                        }
+                    }
+                }
+
+                if (state.becauseItems.isNotEmpty()) {
+                    item(key = "because") {
+                        SunsetContentRow(
+                            title = stringResource(
+                                R.string.home_row_because,
+                                state.becauseTitle.orEmpty(),
+                            ),
+                            items = state.becauseItems,
+                            key = { item -> item.type.name + item.id },
+                            gutter = gutter,
+                            firstItemFocusRequester = rowFocus.getValue("because"),
+                        ) { item, modifier ->
+                            SunsetPosterCard(
+                                title = item.title,
+                                imageUrl = item.posterUrl,
+                                onClick = { onOpenDetails(item.type, item.id) },
+                                year = item.year,
+                                subtitle = item.subtitle,
+                                width = posterWidth,
+                                modifier = itemFocusModifier("because", modifier),
                             )
                         }
                     }

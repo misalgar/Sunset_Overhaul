@@ -104,6 +104,7 @@
     <string name="home_eyebrow_series">SERIE · NUEVO EPISODIO</string>
     <string name="home_eyebrow_continue">CONTINUAR VIENDO</string>
     <string name="home_row_continue">Continuar viendo</string>
+    <string name="home_row_because">Porque viste %1$s</string>
     <string name="home_row_live_now">Ahora en directo</string>
     <string name="home_row_recommended">Recomendado para ti</string>
     <string name="home_row_new_on_sunset">Novedades en Sunset</string>
@@ -188,6 +189,7 @@
     <string name="search_placeholder">Busca en directo, películas y series…</string>
     <string name="search_clear">Borrar búsqueda</string>
     <string name="search_recent">Búsquedas recientes</string>
+    <string name="search_filter_all">Todo</string>
     <string name="search_results_for">Resultados de “%1$s”</string>
     <string name="search_group_live">En directo (%1$d)</string>
     <string name="search_group_movies">Películas (%1$d)</string>
@@ -305,6 +307,7 @@
     <string name="error_maintenance">Sunset se está actualizando. Inténtalo de nuevo en breve.</string>
     <string name="error_rate_limited">Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.</string>
     <string name="error_playback_auth">La autorización de reproducción falló. Inicia sesión de nuevo.</string>
+    <string name="error_channel_unavailable">Este canal no está disponible ahora. Puede estar fuera de línea o no estar incluido en tu plan. Prueba otro canal.</string>
     <string name="error_playback_unsupported">Esta emisión no es compatible con este dispositivo.</string>
     <string name="error_unknown">Algo ha ido mal. Inténtalo de nuevo.</string>
     <string name="common_unknown_error">Algo ha ido mal.</string>
