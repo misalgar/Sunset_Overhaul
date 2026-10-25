@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -37,6 +40,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
@@ -101,6 +105,7 @@ fun SearchRoute(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
     state: SearchUiState,
@@ -126,7 +131,29 @@ fun SearchScreen(
     // navigating up/down past the field can never pop the keyboard (reported on Fire TV).
     var editing by remember { mutableStateOf(!isTv) }
     var launcherFocused by remember { mutableStateOf(false) }
+    var wasImeVisible by remember { mutableStateOf(false) }
+    val imeVisible = WindowInsets.isImeVisible
     val searchShape = RoundedCornerShape(SunsetRadius.Sm)
+
+    // Back dismisses the TV keyboard but does not change `editing` by itself. Treat the IME
+    // disappearing as leaving edit mode so focusing the search box again cannot reopen it.
+    LaunchedEffect(imeVisible) {
+        if (imeVisible) {
+            wasImeVisible = true
+        } else if (wasImeVisible) {
+            wasImeVisible = false
+            if (editing) {
+                editing = false
+                keyboardController?.hide()
+            }
+        }
+    }
+
+    BackHandler(enabled = isTv && editing) {
+        editing = false
+        keyboardController?.hide()
+        runCatching { launcherFocusRequester.requestFocus() }
+    }
 
     val results = state.results
     val liveResults = if (state.filter == SearchFilter.All || state.filter == SearchFilter.Live) {
@@ -294,6 +321,13 @@ fun SearchScreen(
                                     // Not focusable until the viewer opts into editing, so D-pad
                                     // traversal never triggers the IME.
                                     .focusProperties { canFocus = editing }
+                                    .onFocusChanged {
+                                        // Back moves focus to the top navigation; leaving edit mode
+                                        // here keeps a later D-pad visit from reopening the IME.
+                                        if (!it.isFocused && editing) {
+                                            editing = false
+                                        }
+                                    }
                                     .onPreviewKeyEvent { event ->
                                         // With the IME dismissed, Down must move into the results
                                         // rather than wrapping back to the field (the old trap).
