@@ -118,15 +118,25 @@
     <string name="live_title">En directo</string>
     <string name="live_on_now">Ahora</string>
     <string name="live_channels">Canales</string>
+    <string name="live_open_guide">Abrir guía TV</string>
+    <string name="live_guide_hint">Pulsa ◀ para las categorías</string>
+    <string name="live_now_playing">En emisión</string>
+    <string name="live_group_genres">Géneros</string>
+    <string name="live_group_events">Eventos en directo</string>
+    <string name="live_group_countries">Países y regiones</string>
     <string name="live_filter_all">Todos los canales</string>
     <string name="live_filter_favourites">Favoritos</string>
+    <string name="live_filter_adult">Adultos</string>
     <string name="live_empty_title">No hay canales en esta categoría</string>
     <string name="live_empty_body">Prueba otra categoría o actualiza el catálogo.</string>
     <string name="live_no_epg">Guía no disponible</string>
     <string name="live_favourite">Añadir canal a favoritos</string>
     <string name="live_unfavourite">Quitar canal de favoritos</string>
     <string name="live_play_channel">Ver %1$s</string>
-    <string name="live_channel_count">%1$d canales</string>
+    <plurals name="live_channel_count">
+        <item quantity="one">%1$d canal</item>
+        <item quantity="other">%1$d canales</item>
+    </plurals>
 
     <string name="guide_title">Guía de TV</string>
     <string name="guide_date_time">%1$s · %2$s</string>

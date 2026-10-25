@@ -28,6 +28,10 @@ import com.markooverhaul.sunset.core.model.Session
 import com.markooverhaul.sunset.core.model.StreamFormat
 import com.markooverhaul.sunset.core.model.StreamRequest
 import com.markooverhaul.sunset.core.model.StreamSource
+import com.markooverhaul.sunset.core.model.isAdultChannel
+import com.markooverhaul.sunset.core.model.isAdultName
+import com.markooverhaul.sunset.core.model.isInternalLiveCategory
+import com.markooverhaul.sunset.core.model.sanitizeProviderName
 import com.markooverhaul.sunset.core.network.tmdb.TmdbEnricher
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -154,14 +158,20 @@ class XtreamContentProvider @Inject constructor(
         val mapped = XtreamApi.json
             .decodeFromString<List<XtreamCategoryDto>>(body)
             .mapIndexed { index, dto ->
+                val name = sanitizeProviderName(dto.name)
                 Category(
                     id = dto.id,
                     type = CategoryType.LIVE,
-                    name = dto.name,
+                    name = name,
+                    isAdult = isAdultName(name),
                     sortOrder = index,
                 )
             }
-            .filter { it.id.isNotBlank() && it.name.isNotBlank() }
+            .filter {
+                it.id.isNotBlank() &&
+                    it.name.isNotBlank() &&
+                    !isInternalLiveCategory(it.name)
+            }
         categories = mapped
         categoriesFetchedAt = System.currentTimeMillis()
         mapped
@@ -326,7 +336,8 @@ class XtreamContentProvider @Inject constructor(
         ensureCatalogue()
         val liveMatches = mutex.withLock {
             val all = channels ?: loadChannels()
-            all.map { channel -> channel to fuzzyScore(channel.name, term) }
+            all.filterNot { it.isAdult }
+                .map { channel -> channel to fuzzyScore(channel.name, term) }
                 .filter { it.second > 0 }
                 .sortedByDescending { it.second }
                 .map { it.first }
@@ -491,17 +502,25 @@ class XtreamContentProvider @Inject constructor(
                 )
                 .associate { it.id to it.name }
         }.getOrDefault(emptyMap())
+        // Admin categories are removed app-wide, including the channels they would have exposed.
+        val internalCategoryIds = categoryNames
+            .filterValues { isInternalLiveCategory(it) }
+            .keys
         val mapped = XtreamApi.json
             .decodeFromString<List<XtreamLiveStreamDto>>(body)
             .mapIndexedNotNull { index, dto ->
                 if (dto.streamId.isBlank()) return@mapIndexedNotNull null
+                if (dto.categoryId in internalCategoryIds) return@mapIndexedNotNull null
+                val categoryName = categoryNames[dto.categoryId]
                 val resolved = CountryResolver.resolve(
                     rawName = dto.name,
-                    categoryName = categoryNames[dto.categoryId],
+                    categoryName = categoryName,
                 )
+                val displayName = sanitizeProviderName(resolved.name)
+                    .ifBlank { "Channel ${dto.streamId}" }
                 LiveChannel(
                     id = dto.streamId,
-                    name = resolved.name.ifBlank { "Channel ${dto.streamId}" },
+                    name = displayName,
                     number = dto.num.takeIf { it > 0 } ?: (index + 1),
                     logoUrl = dto.streamIcon.takeIf { it.isNotBlank() },
                     categoryIds = listOfNotNull(dto.categoryId.takeIf { it.isNotBlank() }),
@@ -510,6 +529,7 @@ class XtreamContentProvider @Inject constructor(
                     hasCatchUp = dto.tvArchive == 1,
                     catchUpDays = dto.tvArchiveDuration,
                     countryCode = resolved.countryCode,
+                    isAdult = isAdultChannel(displayName, listOf(categoryName)),
                 )
             }
         channels = mapped

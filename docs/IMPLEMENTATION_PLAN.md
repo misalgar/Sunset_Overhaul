@@ -381,7 +381,38 @@ leaves the amber focus ring on the search box, Up still reaches the top navigati
 the box without reopening the IME, and Select reopens it. Submitting from the keyboard still moves
 focus into the first result group.
 
-Next: Live TV master-detail overhaul, catch-up playback, release binding, phone/tablet pass.
+Next: catch-up playback, release binding, phone/tablet pass.
+
+### 5.18 Live TV master-detail overhaul (2026-10-25)
+
+The old single-column Live screen had 45+ horizontal category chips, a duplicated On Now row and a
+1,194-row list that took dozens of D-pad presses to cross.
+
+- **Layout:** TV/tablet use a 27/73 master-detail split. The left sidebar pins All channels and
+  Favourites, then groups provider categories as Genres / Live Events / Countries & Regions with
+  muted, non-focusable headers. The right pane is a 2-column `LazyVerticalGrid` (8 tiles visible).
+  Phones keep the chip row and dense list.
+- **D-pad:** Right or Select enters the grid at row 0; Left from the first column scrolls and
+  focuses the selected category; focusing a category previews it after a 250 ms debounce. The grid
+  and sidebar retry focus while the new content composes.
+- **Cards:** channel numbers are gone. Logos sit in a 64 dp framed `White 6%` surface; the text
+  column shows name, current EPG title (or "Now Playing"), time + LIVE badge, a 2 dp progress bar
+  and a far-right favourite star. Holding Select toggles the favourite without a second focus stop.
+- **Cleanup:** provider instructions (`(presiona …)`) are stripped from live category and channel
+  names; `uso interno` / `banned` categories and their channels are dropped. Adult channels are
+  hidden app-wide (Home, Search, Guide) and only appear under the explicit Adultos row, which
+  aggregates the provider's adult category when one exists.
+- **Guide button / surfaces:** the guide button is a dark elevated surface that turns amber on
+  focus; the divider is replaced by a rounded `White 3%` sidebar container.
+- **Known limitation:** the provider's XMLTV payload currently contains channels but **zero
+  programmes**, so every tile shows "Now Playing" with no time range or progress bar. The EPG
+  fields are wired; they populate as soon as the panel returns a schedule.
+
+Verification: Fire TV screenshots for the grouped sidebar, focus preview, Left/Right restoration,
+long-press favourite (star fills, Favourites count increments, playback does not start), the
+Adultos row (54 channels) and the guide button focus state.
+
+Next: channel availability/offline states, catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification
 

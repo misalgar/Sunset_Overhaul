@@ -123,10 +123,11 @@ class HomeViewModel @Inject constructor(
                     // Live channel rows are available first; the guide and the Room catalogue then
                     // fill their slots independently, so a slow XMLTV parse never hides the hero.
                     val channels = channelsDeferred.await()
+                    val visibleChannels = channels.filterNot { it.isAdult }
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            liveNow = channels.take(10),
+                            liveNow = visibleChannels.take(10),
                             error = null,
                         )
                     }
@@ -152,7 +153,7 @@ class HomeViewModel @Inject constructor(
 
                     launch {
                         val guide = runCatching { guideDeferred.await() }.getOrDefault(emptyList())
-                        _state.update { it.copy(nowNext = nowNextOf(channels, guide, now)) }
+                        _state.update { it.copy(nowNext = nowNextOf(visibleChannels, guide, now)) }
                     }
                 }
             } catch (cancelled: CancellationException) {

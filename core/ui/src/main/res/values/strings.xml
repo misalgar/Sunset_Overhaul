@@ -127,15 +127,25 @@
     <string name="live_title">Live TV</string>
     <string name="live_on_now">On Now</string>
     <string name="live_channels">Channels</string>
+    <string name="live_open_guide">Open TV Guide</string>
+    <string name="live_guide_hint">Press ◀ for categories</string>
+    <string name="live_now_playing">Now Playing</string>
+    <string name="live_group_genres">Genres</string>
+    <string name="live_group_events">Live Events</string>
+    <string name="live_group_countries">Countries &amp; Regions</string>
     <string name="live_filter_all">All channels</string>
     <string name="live_filter_favourites">Favourites</string>
+    <string name="live_filter_adult">Adults</string>
     <string name="live_empty_title">No channels in this category</string>
     <string name="live_empty_body">Try another category or refresh the catalogue.</string>
     <string name="live_no_epg">Guide unavailable</string>
     <string name="live_favourite">Add channel to favourites</string>
     <string name="live_unfavourite">Remove channel from favourites</string>
     <string name="live_play_channel">Watch %1$s</string>
-    <string name="live_channel_count">%1$d channels</string>
+    <plurals name="live_channel_count">
+        <item quantity="one">%1$d channel</item>
+        <item quantity="other">%1$d channels</item>
+    </plurals>
 
     <!-- Guide -->
     <string name="guide_title">TV Guide</string>

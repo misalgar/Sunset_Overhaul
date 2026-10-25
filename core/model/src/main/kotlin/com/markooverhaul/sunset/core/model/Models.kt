@@ -25,6 +25,8 @@ data class LiveChannel(
     val catchUpDays: Int = 0,
     /** ISO-ish country code inferred from the channel prefix or its country category. */
     val countryCode: String? = null,
+    /** Hidden app-wide except in the explicit Adultos row on Live TV. */
+    val isAdult: Boolean = false,
 )
 
 data class EpgProgramme(

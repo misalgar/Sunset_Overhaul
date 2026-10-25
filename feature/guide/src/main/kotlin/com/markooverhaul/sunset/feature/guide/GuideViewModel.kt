@@ -93,7 +93,12 @@ class GuideViewModel @Inject constructor(
                     }
                 }
                 _state.update {
-                    it.copy(isLoading = false, channels = channels, programmes = guide, error = null)
+                    it.copy(
+                        isLoading = false,
+                        channels = channels.filterNot { channel -> channel.isAdult },
+                        programmes = guide,
+                        error = null,
+                    )
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
