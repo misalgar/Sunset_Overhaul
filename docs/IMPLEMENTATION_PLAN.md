@@ -346,6 +346,18 @@ to the rail above, and vertical movement no longer gets stuck or jumps to Play.
 Verified on the Fire TV: fuzzy search results and filters, the Because rail, the live 403 text and
 the cached recommendation path.
 
+### 5.16 Smooth Home scrolling and usable player errors (2026-10-24)
+
+- Home no longer calls `scrollToItem` on every vertical move. It asks the target row’s first card
+  for focus and lets focus-driven bring-into-view scroll only as far as needed, with an animated
+  `animateScrollToItem` fallback when the row is outside the composed window. Verified: moving from
+  Live Now to Because keeps the previous row visible instead of snapping the target to the top.
+- The player error overlay is now root-driven. While an error is shown, the playback key handler
+  keeps focus and Left/Right selects Retry or Exit; Center activates the selected action. The
+  Retry/Exit buttons draw the selection ring manually and are non-focusable, avoiding the native
+  `PlayerView` stealing D-pad input. The player surface is detached while the error is visible.
+  Verified: Right selects Exit, Center leaves the player.
+
 Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification

@@ -179,9 +179,14 @@ fun HomeScreen(
             val index = rowItemIndex(key)
             if (index < 0) return
             scope.launch {
-                runCatching { listState.scrollToItem(index) }
-                kotlinx.coroutines.delay(120)
-                runCatching { rowFocus.getValue(key).requestFocus() }
+                // Prefer focus-driven bring-into-view: it scrolls just enough to reveal the card.
+                // Only fall back to a row scroll when the target row was outside the composed window.
+                val moved = runCatching { rowFocus.getValue(key).requestFocus() }.isSuccess
+                if (!moved) {
+                    runCatching { listState.animateScrollToItem(index) }
+                    kotlinx.coroutines.delay(150)
+                    runCatching { rowFocus.getValue(key).requestFocus() }
+                }
             }
         }
 

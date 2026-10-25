@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -60,6 +61,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markooverhaul.sunset.core.designsystem.components.SunsetPrimaryButton
 import com.markooverhaul.sunset.core.designsystem.components.SunsetSecondaryButton
+import com.markooverhaul.sunset.core.designsystem.components.sunsetFocusRing
 import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
@@ -114,9 +116,20 @@ fun PlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     val error = state.resolveError != null || playback.error != null
     val preparing = !error && (state.isResolving || playback.isPreparing)
+    var errorAction by remember { mutableStateOf(PlayerErrorAction.Retry) }
 
     LaunchedEffect(Unit) {
         runCatching { focusRequester.requestFocus() }
+    }
+
+    // The player root stays focused while the error overlay is visible so the D-pad reliably
+    // switches between Retry and Exit. The overlay buttons are visual/touch targets only.
+    LaunchedEffect(error) {
+        if (error) {
+            errorAction = PlayerErrorAction.Retry
+            delay(100)
+            runCatching { focusRequester.requestFocus() }
+        }
     }
 
     LaunchedEffect(playback.isPlaying, controlsVisible) {
@@ -137,6 +150,29 @@ fun PlayerScreen(
             .background(Color.Black)
             .focusRequester(focusRequester)
             .onPreviewKeyEvent { event ->
+                // Error overlay controls own the D-pad. The focused root switches the selected
+                // action and activates it, independent of the native player view.
+                if (error) {
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    return@onPreviewKeyEvent when (event.key) {
+                        Key.DirectionLeft -> {
+                            errorAction = PlayerErrorAction.Retry
+                            true
+                        }
+
+                        Key.DirectionRight -> {
+                            errorAction = PlayerErrorAction.Exit
+                            true
+                        }
+
+                        Key.DirectionCenter, Key.Enter, Key.Spacebar -> {
+                            if (errorAction == PlayerErrorAction.Retry) onRetry() else onExit()
+                            true
+                        }
+
+                        else -> false
+                    }
+                }
                 when (event.key) {
                     Key.DirectionCenter, Key.Enter, Key.Spacebar -> {
                         if (event.type == KeyEventType.KeyUp) {
@@ -166,7 +202,7 @@ fun PlayerScreen(
                 detectTapGestures(onTap = { controlsVisible = !controlsVisible })
             },
     ) {
-        if (engine != null) {
+        if (engine != null && !error) {
             PlaybackSurface(
                 engine = engine,
                 modifier = Modifier.fillMaxSize(),
@@ -206,6 +242,7 @@ fun PlayerScreen(
                 },
                 failure = playback.error,
                 live = state.live,
+                selectedAction = errorAction,
                 onRetry = onRetry,
                 onExit = onExit,
             )
@@ -458,6 +495,7 @@ private fun PlayerErrorOverlay(
     message: String,
     failure: PlaybackFailure?,
     live: Boolean,
+    selectedAction: PlayerErrorAction,
     onRetry: () -> Unit,
     onExit: () -> Unit,
 ) {
@@ -506,19 +544,37 @@ private fun PlayerErrorOverlay(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val retryShape = RoundedCornerShape(SunsetRadius.Pill)
+                val exitShape = RoundedCornerShape(SunsetRadius.Md)
                 SunsetPrimaryButton(
                     text = stringResource(R.string.action_retry),
                     onClick = onRetry,
                     icon = null,
+                    modifier = Modifier
+                        .focusProperties { canFocus = false }
+                        .sunsetFocusRing(
+                            focused = selectedAction == PlayerErrorAction.Retry,
+                            shape = retryShape,
+                            gap = 2.dp,
+                        ),
                 )
                 SunsetSecondaryButton(
                     text = stringResource(R.string.player_back),
                     onClick = onExit,
+                    modifier = Modifier
+                        .focusProperties { canFocus = false }
+                        .sunsetFocusRing(
+                            focused = selectedAction == PlayerErrorAction.Exit,
+                            shape = exitShape,
+                            gap = 2.dp,
+                        ),
                 )
             }
         }
     }
 }
+
+private enum class PlayerErrorAction { Retry, Exit }
 
 private const val SEEK_STEP_MS = 10_000L
 private const val CONTROLS_AUTO_HIDE_MS = 4_000L
