@@ -294,6 +294,11 @@ Verified on the Fire TV: a warm open of “Fear the Walking Dead” paints the f
 (previously the series skeleton alone exceeded 10 s). The movie “The Virtuoso” also renders its
 hero before the recommendations rail.
 
+Recommendations use a three-state model (`Loading`, `Empty`, `Loaded`). While loading, the “More
+like this” header, a small spinner and “Finding similar titles…” sit above four layout-matched
+poster skeletons, so the rail reserves its final height and does not pop in later. If both TMDB and
+the genre fallback return nothing, the section is hidden instead of showing a dead spinner.
+
 Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification

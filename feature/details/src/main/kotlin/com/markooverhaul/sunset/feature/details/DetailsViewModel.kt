@@ -28,6 +28,12 @@ sealed interface SimilarItem {
     data class SeriesItem(val series: SeriesSummary) : SimilarItem
 }
 
+sealed interface SimilarState {
+    data object Loading : SimilarState
+    data object Empty : SimilarState
+    data class Loaded(val items: List<SimilarItem>) : SimilarState
+}
+
 data class DetailsUiState(
     val isLoading: Boolean = true,
     val isLoadingDetail: Boolean = false,
@@ -36,7 +42,7 @@ data class DetailsUiState(
     val selectedSeason: Int = 1,
     val progress: WatchProgress? = null,
     val isFavourite: Boolean = false,
-    val similar: List<SimilarItem> = emptyList(),
+    val similar: SimilarState = SimilarState.Loading,
     val error: Throwable? = null,
 ) {
     val title: String
@@ -89,7 +95,9 @@ class DetailsViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update {
+                it.copy(isLoading = true, isLoadingDetail = false, error = null, similar = SimilarState.Loading)
+            }
             try {
                 when (contentType) {
                     ContentType.MOVIE -> loadMovie()
@@ -117,7 +125,7 @@ class DetailsViewModel @Inject constructor(
                     isLoading = false,
                     isLoadingDetail = true,
                     movie = summary,
-                    similar = emptyList(),
+                    similar = SimilarState.Loading,
                     error = null,
                 )
             }
@@ -130,6 +138,7 @@ class DetailsViewModel @Inject constructor(
                     isLoading = false,
                     isLoadingDetail = false,
                     error = ProviderError.NotFound,
+                    similar = SimilarState.Empty,
                 )
             }
             return
@@ -160,7 +169,16 @@ class DetailsViewModel @Inject constructor(
                 }
             }
             if (_state.value.movie?.id == movie.id) {
-                _state.update { it.copy(similar = similar.map(SimilarItem::MovieItem)) }
+                val items = similar.map(SimilarItem::MovieItem)
+                _state.update {
+                    it.copy(
+                        similar = if (items.isEmpty()) {
+                            SimilarState.Empty
+                        } else {
+                            SimilarState.Loaded(items)
+                        },
+                    )
+                }
             }
         }
     }
@@ -176,7 +194,7 @@ class DetailsViewModel @Inject constructor(
                     isLoading = false,
                     isLoadingDetail = true,
                     series = SeriesDetail(summary = summary),
-                    similar = emptyList(),
+                    similar = SimilarState.Loading,
                     error = null,
                 )
             }
@@ -189,6 +207,7 @@ class DetailsViewModel @Inject constructor(
                     isLoading = false,
                     isLoadingDetail = false,
                     error = ProviderError.NotFound,
+                    similar = SimilarState.Empty,
                 )
             }
             return
@@ -223,7 +242,16 @@ class DetailsViewModel @Inject constructor(
                 }
             }
             if (_state.value.series?.summary?.id == detail.summary.id) {
-                _state.update { it.copy(similar = similar.map(SimilarItem::SeriesItem)) }
+                val items = similar.map(SimilarItem::SeriesItem)
+                _state.update {
+                    it.copy(
+                        similar = if (items.isEmpty()) {
+                            SimilarState.Empty
+                        } else {
+                            SimilarState.Loaded(items)
+                        },
+                    )
+                }
             }
         }
     }

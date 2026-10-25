@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -288,41 +290,106 @@ fun DetailsScreen(
                         }
                     }
 
-                    if (state.similar.isNotEmpty()) {
-                        item(key = "similar") {
-                            SunsetContentRow(
-                                title = stringResource(R.string.details_more_like_this),
-                                items = state.similar,
-                                key = { item ->
-                                    when (item) {
-                                        is SimilarItem.MovieItem -> item.movie.id
-                                        is SimilarItem.SeriesItem -> item.series.id
-                                    }
-                                },
-                                gutter = gutter,
-                            ) { item ->
-                                when (item) {
-                                    is SimilarItem.MovieItem -> SunsetPosterCard(
-                                        title = item.movie.title,
-                                        imageUrl = item.movie.posterUrl,
-                                        onClick = { onOpenDetails(ContentType.MOVIE, item.movie.id) },
-                                        year = item.movie.year,
-                                        subtitle = item.movie.genres.firstOrNull(),
-                                        width = if (isTv) 184.dp else 148.dp,
-                                    )
+                    when (val similar = state.similar) {
+                        SimilarState.Loading -> item(key = "similar-loading") {
+                            SimilarLoadingRail(gutter = gutter, isTv = isTv)
+                        }
 
-                                    is SimilarItem.SeriesItem -> SunsetPosterCard(
-                                        title = item.series.title,
-                                        imageUrl = item.series.posterUrl,
-                                        onClick = { onOpenDetails(ContentType.SERIES, item.series.id) },
-                                        year = item.series.year,
-                                        subtitle = item.series.genres.firstOrNull(),
-                                        width = if (isTv) 184.dp else 148.dp,
-                                    )
+                        SimilarState.Empty -> Unit
+
+                        is SimilarState.Loaded -> if (similar.items.isNotEmpty()) {
+                            item(key = "similar") {
+                                SunsetContentRow(
+                                    title = stringResource(R.string.details_more_like_this),
+                                    items = similar.items,
+                                    key = { item ->
+                                        when (item) {
+                                            is SimilarItem.MovieItem -> item.movie.id
+                                            is SimilarItem.SeriesItem -> item.series.id
+                                        }
+                                    },
+                                    gutter = gutter,
+                                ) { item ->
+                                    when (item) {
+                                        is SimilarItem.MovieItem -> SunsetPosterCard(
+                                            title = item.movie.title,
+                                            imageUrl = item.movie.posterUrl,
+                                            onClick = { onOpenDetails(ContentType.MOVIE, item.movie.id) },
+                                            year = item.movie.year,
+                                            subtitle = item.movie.genres.firstOrNull(),
+                                            width = if (isTv) 184.dp else 148.dp,
+                                        )
+
+                                        is SimilarItem.SeriesItem -> SunsetPosterCard(
+                                            title = item.series.title,
+                                            imageUrl = item.series.posterUrl,
+                                            onClick = { onOpenDetails(ContentType.SERIES, item.series.id) },
+                                            year = item.series.year,
+                                            subtitle = item.series.genres.firstOrNull(),
+                                            width = if (isTv) 184.dp else 148.dp,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SimilarLoadingRail(
+    gutter: androidx.compose.ui.unit.Dp,
+    isTv: Boolean,
+) {
+    val cardWidth = if (isTv) 184.dp else 148.dp
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SunsetSectionHeader(
+            title = stringResource(R.string.details_more_like_this),
+            modifier = Modifier.padding(horizontal = gutter),
+        )
+        Row(
+            modifier = Modifier.padding(horizontal = gutter),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                color = SunsetColors.AccentPrimary,
+                strokeWidth = 1.5.dp,
+            )
+            Text(
+                text = stringResource(R.string.details_similar_loading),
+                style = MaterialTheme.typography.bodySmall,
+                color = SunsetColors.TextSecondary,
+            )
+        }
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = gutter),
+        ) {
+            items(4) {
+                Column(
+                    modifier = Modifier.width(cardWidth),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SunsetSkeleton(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(2f / 3f),
+                    )
+                    SunsetSkeleton(
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .height(14.dp),
+                    )
+                    SunsetSkeleton(
+                        modifier = Modifier
+                            .fillMaxWidth(0.4f)
+                            .height(12.dp),
+                    )
                 }
             }
         }

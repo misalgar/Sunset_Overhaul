@@ -187,6 +187,7 @@
     <string name="details_cast">Cast</string>
     <string name="details_director">Director</string>
     <string name="details_more_like_this">More like this</string>
+    <string name="details_similar_loading">Finding similar titles…</string>
     <string name="details_episodes">Episodes</string>
     <string name="details_episodes_coming_soon">Episodes coming soon</string>
     <string name="details_resume_at">Resume from %1$s</string>

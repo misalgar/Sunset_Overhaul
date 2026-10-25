@@ -175,6 +175,7 @@
     <string name="details_cast">Reparto</string>
     <string name="details_director">Dirección</string>
     <string name="details_more_like_this">Títulos similares</string>
+    <string name="details_similar_loading">Buscando títulos similares…</string>
     <string name="details_episodes">Episodios</string>
     <string name="details_episodes_coming_soon">Episodios próximamente</string>
     <string name="details_resume_at">Continuar desde %1$s</string>
