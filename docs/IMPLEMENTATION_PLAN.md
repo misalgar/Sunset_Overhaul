@@ -358,6 +358,20 @@ the cached recommendation path.
   `PlayerView` stealing D-pad input. The player surface is detached while the error is visible.
   Verified: Right selects Exit, Center leaves the player.
 
+### 5.17 Search IME state after Back (2026-10-25)
+
+The TV search field kept `editing = true` when the system keyboard was dismissed with Back. Focus
+moved to the top navigation, and returning Down to the search box re-focused the still-editable
+field and reopened the IME.
+
+- A `BackHandler` while editing clears edit mode, hides the IME and returns focus to the search
+  launcher.
+- An IME visibility effect also clears edit mode when the keyboard transitions from visible to
+  hidden, covering the case where the system IME consumes Back.
+- The field also clears edit mode when it loses focus (the observed focus move to the top nav).
+- The text field remains non-focusable unless `editing` is true; the launcher is the D-pad target,
+  so only an explicit Select opens the keyboard again.
+
 Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification
