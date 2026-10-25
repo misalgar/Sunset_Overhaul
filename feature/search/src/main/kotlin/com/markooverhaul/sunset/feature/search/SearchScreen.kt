@@ -424,21 +424,23 @@ fun SearchScreen(
                                     items = results.movies,
                                     key = { it.id },
                                     gutter = gutter,
-                                ) { movie ->
+                                ) { movie, itemModifier ->
                                     SunsetPosterCard(
                                         title = movie.title,
                                         imageUrl = movie.posterUrl,
                                         onClick = { onOpenDetails(ContentType.MOVIE, movie.id) },
                                         year = movie.year,
                                         subtitle = movie.genres.firstOrNull(),
-                                        modifier = if (
-                                            focusGroup == SearchFocusGroup.Movies &&
-                                            movie.id == results.movies.first().id
-                                        ) {
-                                            Modifier.focusRequester(resultsFocusRequester)
-                                        } else {
-                                            Modifier
-                                        },
+                                        modifier = itemModifier.then(
+                                            if (
+                                                focusGroup == SearchFocusGroup.Movies &&
+                                                movie.id == results.movies.first().id
+                                            ) {
+                                                Modifier.focusRequester(resultsFocusRequester)
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
                                         width = posterWidth,
                                     )
                                 }
@@ -452,21 +454,23 @@ fun SearchScreen(
                                     items = results.series,
                                     key = { it.id },
                                     gutter = gutter,
-                                ) { series ->
+                                ) { series, itemModifier ->
                                     SunsetPosterCard(
                                         title = series.title,
                                         imageUrl = series.posterUrl,
                                         onClick = { onOpenDetails(ContentType.SERIES, series.id) },
                                         year = series.year,
                                         subtitle = series.genres.firstOrNull(),
-                                        modifier = if (
-                                            focusGroup == SearchFocusGroup.Series &&
-                                            series.id == results.series.first().id
-                                        ) {
-                                            Modifier.focusRequester(resultsFocusRequester)
-                                        } else {
-                                            Modifier
-                                        },
+                                        modifier = itemModifier.then(
+                                            if (
+                                                focusGroup == SearchFocusGroup.Series &&
+                                                series.id == results.series.first().id
+                                            ) {
+                                                Modifier.focusRequester(resultsFocusRequester)
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
                                         width = posterWidth,
                                     )
                                 }

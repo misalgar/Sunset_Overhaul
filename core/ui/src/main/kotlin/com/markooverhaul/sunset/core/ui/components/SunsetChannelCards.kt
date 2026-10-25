@@ -43,64 +43,63 @@ fun SunsetChannelCard(
     width: Dp = 250.dp,
 ) {
     val shape = RoundedCornerShape(SunsetRadius.Md)
-    Column(
+    SunsetFocusable(
+        onClick = onClick,
         modifier = modifier.width(width),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        shape = shape,
     ) {
-        SunsetFocusable(onClick = onClick, shape = shape) {
-            Column(
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SunsetColors.BgSurface2, shape)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(SunsetColors.BgSurface2, shape)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .aspectRatio(16f / 9f)
+                    .background(SunsetColors.BgSurface3, RoundedCornerShape(SunsetRadius.Sm)),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
+                ChannelLogo(name = channel.name, logoUrl = channel.logoUrl, modifier = Modifier.width(72.dp))
+                LiveBadge(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(SunsetColors.BgSurface3, RoundedCornerShape(SunsetRadius.Sm)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ChannelLogo(name = channel.name, logoUrl = channel.logoUrl, modifier = Modifier.width(72.dp))
-                    LiveBadge(
+                        .align(Alignment.TopStart)
+                        .padding(8.dp),
+                )
+                if (progress != null && progress > 0f) {
+                    SunsetProgressBar(
+                        progress = progress,
                         modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp),
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                     )
-                    if (progress != null && progress > 0f) {
-                        SunsetProgressBar(
-                            progress = progress,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                        )
-                    }
                 }
+            }
+            Text(
+                text = "${channel.number}  ${channel.name}",
+                style = MaterialTheme.typography.titleSmall,
+                color = SunsetColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (nowTitle != null) {
                 Text(
-                    text = "${channel.number}  ${channel.name}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = SunsetColors.TextPrimary,
+                    text = nowTitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SunsetColors.TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (nowTitle != null) {
-                    Text(
-                        text = nowTitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SunsetColors.TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (timeRange != null) {
-                    Text(
-                        text = timeRange,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = SunsetColors.TextTertiary,
-                        maxLines = 1,
-                    )
-                }
+            }
+            if (timeRange != null) {
+                Text(
+                    text = timeRange,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = SunsetColors.TextTertiary,
+                    maxLines = 1,
+                )
             }
         }
     }

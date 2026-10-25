@@ -309,7 +309,7 @@ fun DetailsScreen(
                                         }
                                     },
                                     gutter = gutter,
-                                ) { item ->
+                                ) { item, modifier ->
                                     when (item) {
                                         is SimilarItem.MovieItem -> SunsetPosterCard(
                                             title = item.movie.title,
@@ -318,6 +318,7 @@ fun DetailsScreen(
                                             year = item.movie.year,
                                             subtitle = item.movie.genres.firstOrNull(),
                                             width = if (isTv) 184.dp else 148.dp,
+                                            modifier = modifier,
                                         )
 
                                         is SimilarItem.SeriesItem -> SunsetPosterCard(
@@ -327,6 +328,7 @@ fun DetailsScreen(
                                             year = item.series.year,
                                             subtitle = item.series.genres.firstOrNull(),
                                             width = if (isTv) 184.dp else 148.dp,
+                                            modifier = modifier,
                                         )
                                     }
                                 }

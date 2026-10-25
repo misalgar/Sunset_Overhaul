@@ -1,4 +1,4 @@
-package com.markooverhaul.sunset.feature.home
+﻿package com.markooverhaul.sunset.feature.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,13 +13,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -44,6 +54,7 @@ import com.markooverhaul.sunset.core.ui.components.SunsetPosterCard
 import com.markooverhaul.sunset.core.ui.util.SunsetFormat
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private const val TV_POSTER_COLUMNS = 6
 private val TV_MIN_POSTER_WIDTH = 120.dp
@@ -98,7 +109,7 @@ fun HomeScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val gutter = if (isTv) 48.dp else 16.dp
         val itemSpacing = if (isTv) 16.dp else 12.dp
-        // 6 columns on TV (spec §7.5) and never larger than 176 dp, so a full row plus captions
+        // 6 columns on TV (spec Â§7.5) and never larger than 176 dp, so a full row plus captions
         // fits a 10-foot layout instead of four oversized posters.
         val posterWidth = if (isTv) {
             ((maxWidth - gutter * 2 - itemSpacing * (TV_POSTER_COLUMNS - 1)) / TV_POSTER_COLUMNS.toFloat())
@@ -114,8 +125,112 @@ fun HomeScreen(
             400.dp
         }
 
+        // TV rails are laid out vertically, but Compose's geometric focus search tends to keep
+        // moving sideways inside a LazyRow. Explicit up/down links make Down go to the next row and
+        // Up return to the row above instead of jumping to the hero.
+        val heroFocus = remember { FocusRequester() }
+        var initialHeroFocusApplied by remember { mutableStateOf(false) }
+        LaunchedEffect(state.hero?.id, isTv) {
+            if (isTv && state.hero != null && !initialHeroFocusApplied) {
+                initialHeroFocusApplied = true
+                runCatching { heroFocus.requestFocus() }
+            }
+        }
+        val rowFocus = remember {
+            mapOf(
+                "continue" to FocusRequester(),
+                "live" to FocusRequester(),
+                "discovery" to FocusRequester(),
+                "recentMovies" to FocusRequester(),
+                "recentSeries" to FocusRequester(),
+                "saved" to FocusRequester(),
+            )
+        }
+        val hasHistory = state.continueWatching.isNotEmpty()
+        val discovery = if (hasHistory) state.recommended else state.recentMovies
+        val saved = savedCards(state)
+        val visibleRowKeys = buildList {
+            if (state.continueWatching.isNotEmpty()) add("continue")
+            if (state.liveNow.isNotEmpty()) add("live")
+            if (discovery.isNotEmpty()) add("discovery")
+            if (state.recentMovies.isNotEmpty()) add("recentMovies")
+            if (state.recentSeries.isNotEmpty()) add("recentSeries")
+            if (saved.isNotEmpty()) add("saved")
+        }
+        val listState = rememberLazyListState()
+        val scope = rememberCoroutineScope()
+        var focusedRowKey by remember { mutableStateOf<String?>(null) }
+        val heroItemOffset = if (state.hero != null) 1 else 0
+
+        fun itemFocusModifier(key: String, modifier: Modifier): Modifier = modifier.onFocusChanged {
+            if (it.isFocused) {
+                focusedRowKey = key
+            } else if (focusedRowKey == key) {
+                focusedRowKey = null
+            }
+        }
+
+        fun rowItemIndex(key: String): Int =
+            1 + heroItemOffset + visibleRowKeys.indexOf(key)
+
+        fun focusRow(key: String) {
+            val index = rowItemIndex(key)
+            if (index < 0) return
+            scope.launch {
+                runCatching { listState.scrollToItem(index) }
+                kotlinx.coroutines.delay(120)
+                runCatching { rowFocus.getValue(key).requestFocus() }
+            }
+        }
+
+        fun focusHero() {
+            if (state.hero == null) return
+            scope.launch {
+                runCatching { listState.scrollToItem(1) }
+                kotlinx.coroutines.delay(120)
+                runCatching { heroFocus.requestFocus() }
+            }
+        }
+
+        fun moveUp(key: String) {
+            val index = visibleRowKeys.indexOf(key)
+            when {
+                index < 0 -> Unit
+                index == 0 -> focusHero()
+                else -> focusRow(visibleRowKeys[index - 1])
+            }
+        }
+
+        fun moveDown(key: String) {
+            val index = visibleRowKeys.indexOf(key)
+            visibleRowKeys.getOrNull(index + 1)?.let(::focusRow)
+        }
+
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    val row = focusedRowKey
+                    when (event.key) {
+                        Key.DirectionUp -> if (row != null) {
+                            moveUp(row)
+                            true
+                        } else {
+                            false
+                        }
+
+                        Key.DirectionDown -> if (row != null) {
+                            moveDown(row)
+                            true
+                        } else {
+                            false
+                        }
+
+                        else -> false
+                    }
+                },
             contentPadding = PaddingValues(bottom = if (isTv) 64.dp else 40.dp),
             verticalArrangement = Arrangement.spacedBy(if (isTv) 20.dp else 28.dp),
         ) {
@@ -171,6 +286,7 @@ fun HomeScreen(
                             },
                             isTv = isTv,
                             height = heroHeight,
+                            focusRequester = heroFocus,
                             onPlay = { onPlayMovie(hero) },
                             onResume = onResume,
                             onDetails = { onOpenDetails(ContentType.MOVIE, hero.id) },
@@ -185,7 +301,8 @@ fun HomeScreen(
                             items = state.continueWatching,
                             key = { it.contentId + it.episodeId.orEmpty() },
                             gutter = gutter,
-                        ) { progress ->
+                            firstItemFocusRequester = rowFocus.getValue("continue"),
+                        ) { progress, modifier ->
                             SunsetLandscapeCard(
                                 title = progress.title,
                                 imageUrl = null,
@@ -193,6 +310,7 @@ fun HomeScreen(
                                 eyebrow = contentTypeLabel(progress.contentType),
                                 progress = progress.fraction,
                                 width = if (isTv) 240.dp else 200.dp,
+                                modifier = itemFocusModifier("continue", modifier),
                             )
                         }
                     }
@@ -207,7 +325,8 @@ fun HomeScreen(
                             gutter = gutter,
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenLive,
-                        ) { channel ->
+                            firstItemFocusRequester = rowFocus.getValue("live"),
+                        ) { channel, modifier ->
                             val nowNext = state.nowNext[channel.id]
                             SunsetChannelCard(
                                 channel = channel,
@@ -222,13 +341,12 @@ fun HomeScreen(
                                         .coerceIn(0f, 1f)
                                 },
                                 width = if (isTv) 240.dp else 220.dp,
+                                modifier = itemFocusModifier("live", modifier),
                             )
                         }
                     }
                 }
 
-                val hasHistory = state.continueWatching.isNotEmpty()
-                val discovery = if (hasHistory) state.recommended else state.recentMovies
                 if (discovery.isNotEmpty()) {
                     item(key = "discovery") {
                         SunsetContentRow(
@@ -240,8 +358,14 @@ fun HomeScreen(
                             gutter = gutter,
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenMovies,
-                        ) { movie ->
-                            MoviePoster(movie, posterWidth, onOpenDetails)
+                            firstItemFocusRequester = rowFocus.getValue("discovery"),
+                        ) { movie, modifier ->
+                            MoviePoster(
+                                movie,
+                                posterWidth,
+                                onOpenDetails,
+                                itemFocusModifier("discovery", modifier),
+                            )
                         }
                     }
                 }
@@ -255,8 +379,14 @@ fun HomeScreen(
                             gutter = gutter,
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenMovies,
-                        ) { movie ->
-                            MoviePoster(movie, posterWidth, onOpenDetails)
+                            firstItemFocusRequester = rowFocus.getValue("recentMovies"),
+                        ) { movie, modifier ->
+                            MoviePoster(
+                                movie,
+                                posterWidth,
+                                onOpenDetails,
+                                itemFocusModifier("recentMovies", modifier),
+                            )
                         }
                     }
                 }
@@ -270,13 +400,18 @@ fun HomeScreen(
                             gutter = gutter,
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenSeries,
-                        ) { series ->
-                            SeriesPoster(series, posterWidth, onOpenDetails)
+                            firstItemFocusRequester = rowFocus.getValue("recentSeries"),
+                        ) { series, modifier ->
+                            SeriesPoster(
+                                series,
+                                posterWidth,
+                                onOpenDetails,
+                                itemFocusModifier("recentSeries", modifier),
+                            )
                         }
                     }
                 }
 
-                val saved = savedCards(state)
                 if (saved.isNotEmpty()) {
                     item(key = "saved") {
                         SunsetContentRow(
@@ -286,7 +421,8 @@ fun HomeScreen(
                             gutter = gutter,
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenMyList,
-                        ) { card ->
+                            firstItemFocusRequester = rowFocus.getValue("saved"),
+                        ) { card, modifier ->
                             SunsetPosterCard(
                                 title = card.title,
                                 imageUrl = card.posterUrl,
@@ -294,6 +430,7 @@ fun HomeScreen(
                                 year = card.year,
                                 subtitle = card.subtitle,
                                 width = posterWidth,
+                                modifier = itemFocusModifier("saved", modifier),
                             )
                         }
                     }
@@ -310,12 +447,12 @@ private fun HeroSection(
     progress: WatchProgress?,
     isTv: Boolean,
     height: androidx.compose.ui.unit.Dp,
+    focusRequester: FocusRequester,
     onPlay: () -> Unit,
     onResume: (WatchProgress) -> Unit,
     onDetails: () -> Unit,
 ) {
     val context = LocalContext.current
-    val focusRequester = remember { FocusRequester() }
     val resumable = progress != null && progress.fraction >= WatchProgress.MIN_RESUME_FRACTION
     val meta = buildList {
         movie.year?.let { add(it.toString()) }
@@ -323,10 +460,6 @@ private fun HeroSection(
         SunsetFormat.runtime(context, movie.durationMinutes)?.let { add(it) }
         movie.rating?.let { add(context.getString(R.string.rating_value, String.format(Locale.getDefault(), "%.1f", it))) }
         movie.genres.firstOrNull()?.let { add(it) }
-    }
-
-    LaunchedEffect(movie.id, isTv) {
-        if (isTv) runCatching { focusRequester.requestFocus() }
     }
 
     SunsetHeroBillboard(
@@ -349,6 +482,7 @@ private fun MoviePoster(
     movie: Movie,
     width: androidx.compose.ui.unit.Dp,
     onOpenDetails: (ContentType, String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     SunsetPosterCard(
         title = movie.title,
@@ -357,6 +491,7 @@ private fun MoviePoster(
         year = movie.year,
         subtitle = movie.genres.firstOrNull() ?: movie.year?.toString(),
         width = width,
+        modifier = modifier,
     )
 }
 
@@ -365,6 +500,7 @@ private fun SeriesPoster(
     series: SeriesSummary,
     width: androidx.compose.ui.unit.Dp,
     onOpenDetails: (ContentType, String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val subtitle = if (series.seasonCount == 1) {
         stringResource(R.string.season_count_one, series.seasonCount)
@@ -378,6 +514,7 @@ private fun SeriesPoster(
         year = series.year,
         subtitle = subtitle,
         width = width,
+        modifier = modifier,
     )
 }
 
@@ -436,3 +573,4 @@ private fun savedCards(state: HomeUiState): List<SavedCard> = buildList {
         .filter { it.id in state.favouriteIds }
         .forEach { add(SavedCard(it.id, ContentType.SERIES, it.title, it.posterUrl, it.year, it.genres.firstOrNull())) }
 }
+

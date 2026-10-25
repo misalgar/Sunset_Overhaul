@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.markooverhaul.sunset.core.designsystem.components.SunsetSectionHeader
@@ -29,7 +31,8 @@ fun <T> SunsetContentRow(
     onSeeAll: (() -> Unit)? = null,
     gutter: Dp = 16.dp,
     itemSpacing: Dp = 16.dp,
-    content: @Composable (T) -> Unit,
+    firstItemFocusRequester: FocusRequester? = null,
+    content: @Composable (T, Modifier) -> Unit,
 ) {
     if (items.isEmpty()) return
     val isTv = LocalIsTelevision.current
@@ -53,8 +56,13 @@ fun <T> SunsetContentRow(
                 end = gutter + if (isTv) 96.dp else 48.dp,
             ),
         ) {
-            items(items = items, key = { key(it) }) { item ->
-                content(item)
+            itemsIndexed(items = items, key = { _, item -> key(item) }) { index, item ->
+                val itemModifier = if (index == 0 && firstItemFocusRequester != null) {
+                    Modifier.focusRequester(firstItemFocusRequester)
+                } else {
+                    Modifier
+                }
+                content(item, itemModifier)
             }
         }
     }

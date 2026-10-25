@@ -299,6 +299,22 @@ like this” header, a small spinner and “Finding similar titles…” sit abo
 poster skeletons, so the rail reserves its final height and does not pop in later. If both TMDB and
 the genre fallback return nothing, the section is hidden instead of showing a dead spinner.
 
+### 5.13 Home D-pad row traversal (2026-10-24)
+
+Nested `LazyRow`s made Compose’s geometric focus search unreliable: Down inside Live Now could stay
+in the rail, and Up from Recently added in Movies jumped to the hero.
+
+- Home tracks the focused rail and intercepts Up/Down at the `LazyColumn` root.
+- Moving vertically scrolls to the adjacent row and requests focus on its **first card**. This works
+  even when the target row was outside the composed window.
+- The hero’s initial focus request moved from the hero item to the screen, so recycling the hero
+  while scrolling no longer steals focus back.
+- “See all” and the hero keep their normal focus behaviour; the row handler only runs while a rail
+  card is focused.
+
+Verified on the Fire TV: Down from Live Now moves to the next rail, Up from Recently added returns
+to the rail above, and vertical movement no longer gets stuck or jumps to Play.
+
 Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification
