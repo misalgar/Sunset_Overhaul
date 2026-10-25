@@ -68,12 +68,17 @@ class RoutingContentProvider @Inject constructor(
     override suspend fun getMovies(categoryId: String?, page: Int): PagedResult<Movie> =
         active.getMovies(categoryId, page)
 
+    override suspend fun getMovieSummary(id: String): Movie? = active.getMovieSummary(id)
+
     override suspend fun getMovie(id: String): Movie? = active.getMovie(id)
 
     override suspend fun getSeriesCategories(): List<Category> = active.getSeriesCategories()
 
     override suspend fun getSeries(categoryId: String?, page: Int): PagedResult<SeriesSummary> =
         active.getSeries(categoryId, page)
+
+    override suspend fun getSeriesSummary(id: String): SeriesSummary? =
+        active.getSeriesSummary(id)
 
     override suspend fun getSeriesDetail(id: String): SeriesDetail? = active.getSeriesDetail(id)
 

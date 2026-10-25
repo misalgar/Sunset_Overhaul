@@ -221,10 +221,12 @@ interface ContentProvider {
 
     suspend fun getMovieCategories(): List<Category>
     suspend fun getMovies(categoryId: String? = null, page: Int = 1): PagedResult<Movie>
+    suspend fun getMovieSummary(id: String): Movie? = null
     suspend fun getMovie(id: String): Movie?
 
     suspend fun getSeriesCategories(): List<Category>
     suspend fun getSeries(categoryId: String? = null, page: Int = 1): PagedResult<SeriesSummary>
+    suspend fun getSeriesSummary(id: String): SeriesSummary? = null
     suspend fun getSeriesDetail(id: String): SeriesDetail?
     suspend fun getEpisodes(seriesId: String, season: Int): List<Episode>
 

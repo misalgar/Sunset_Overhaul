@@ -229,6 +229,11 @@ class XtreamContentProvider @Inject constructor(
         return entity.toDomain()
     }
 
+    override suspend fun getMovieSummary(id: String): Movie? {
+        ensureCatalogue()
+        return catalogueDao.movie(id)?.toDomain()
+    }
+
     override suspend fun getSeriesCategories(): List<Category> = categoryMutex.withLock {
         seriesCategories
             ?: loadCategories("series_categories", "get_series_categories", CategoryType.SERIES)
@@ -258,17 +263,33 @@ class XtreamContentProvider @Inject constructor(
         )
     }
 
+    override suspend fun getSeriesSummary(id: String): SeriesSummary? {
+        ensureCatalogue()
+        return catalogueDao.series(id)?.toSummary()
+    }
+
     override suspend fun getSeriesDetail(id: String): SeriesDetail? {
         ensureCatalogue()
         var entity = catalogueDao.series(id) ?: return null
-        entity = enrichSeries(entity)
         if (entity.episodesSyncedAtUtcMs == 0L) {
             syncSeriesEpisodes(entity)
             entity = catalogueDao.series(id) ?: entity
         }
-        var episodes = catalogueDao.episodes(id)
-        tmdb.enrichSeasons(entity, episodes)
-        episodes = catalogueDao.episodes(id)
+        val episodes = catalogueDao.episodes(id)
+
+        // TMDB metadata and episode stills are enrichment, not a prerequisite for showing the
+        // series. Keeping them off the critical path is the difference between a ~1 s hero and a
+        // 10 s full-screen skeleton on the Fire TV.
+        if (tmdb.isConfigured) {
+            providerScope.launch {
+                val enriched = if (entity.tmdbId == null && entity.tmdbMatchedAtUtcMs == 0L) {
+                    runCatching { tmdb.enrichSeries(entity) }.getOrDefault(entity)
+                } else {
+                    entity
+                }
+                runCatching { tmdb.enrichSeasons(enriched, episodes) }
+            }
+        }
         return entity.toDetail(episodes)
     }
 

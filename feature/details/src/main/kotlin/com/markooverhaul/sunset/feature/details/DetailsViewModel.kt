@@ -30,6 +30,7 @@ sealed interface SimilarItem {
 
 data class DetailsUiState(
     val isLoading: Boolean = true,
+    val isLoadingDetail: Boolean = false,
     val movie: Movie? = null,
     val series: SeriesDetail? = null,
     val selectedSeason: Int = 1,
@@ -106,65 +107,124 @@ class DetailsViewModel @Inject constructor(
     }
 
     private suspend fun loadMovie() {
+        // Fast path: paint the title/artwork from Room while provider detail and TMDB load.
+        val summary = withContext(ioDispatcher) {
+            runCatching { provider.getMovieSummary(contentId) }.getOrNull()
+        }
+        if (summary != null) {
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isLoadingDetail = true,
+                    movie = summary,
+                    similar = emptyList(),
+                    error = null,
+                )
+            }
+        }
+
         val movie = withContext(ioDispatcher) { provider.getMovie(contentId) }
         if (movie == null) {
-            _state.update { it.copy(isLoading = false, error = ProviderError.NotFound) }
-            return
-        }
-        val recommended = withContext(ioDispatcher) {
-            provider.getMovieRecommendations(movie.id)
-        }
-        val similar = if (recommended.isNotEmpty()) {
-            recommended
-        } else {
-            withContext(ioDispatcher) {
-                provider.getMovies(page = 1).items
-                    .filter { candidate ->
-                        candidate.id != movie.id && candidate.genres.any { it in movie.genres }
-                    }
-                    .take(10)
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isLoadingDetail = false,
+                    error = ProviderError.NotFound,
+                )
             }
+            return
         }
         _state.update {
             it.copy(
                 isLoading = false,
+                isLoadingDetail = false,
                 movie = movie,
-                similar = similar.map(SimilarItem::MovieItem),
                 error = null,
             )
+        }
+        viewModelScope.launch {
+            val recommended = withContext(ioDispatcher) {
+                runCatching { provider.getMovieRecommendations(movie.id) }
+                    .getOrDefault(emptyList())
+            }
+            val similar = if (recommended.isNotEmpty()) {
+                recommended
+            } else {
+                withContext(ioDispatcher) {
+                    provider.getMovies(page = 1).items
+                        .filter { candidate ->
+                            candidate.id != movie.id &&
+                                candidate.genres.any { it in movie.genres }
+                        }
+                        .take(10)
+                }
+            }
+            if (_state.value.movie?.id == movie.id) {
+                _state.update { it.copy(similar = similar.map(SimilarItem::MovieItem)) }
+            }
         }
     }
 
     private suspend fun loadSeries() {
+        // Fast path: the Room summary paints the hero while the provider detail and enrichment load.
+        val summary = withContext(ioDispatcher) {
+            runCatching { provider.getSeriesSummary(contentId) }.getOrNull()
+        }
+        if (summary != null) {
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isLoadingDetail = true,
+                    series = SeriesDetail(summary = summary),
+                    similar = emptyList(),
+                    error = null,
+                )
+            }
+        }
+
         val detail = withContext(ioDispatcher) { provider.getSeriesDetail(contentId) }
         if (detail == null) {
-            _state.update { it.copy(isLoading = false, error = ProviderError.NotFound) }
-            return
-        }
-        val recommended = withContext(ioDispatcher) {
-            provider.getSeriesRecommendations(detail.summary.id)
-        }
-        val similar = if (recommended.isNotEmpty()) {
-            recommended
-        } else {
-            val genres = detail.summary.genres
-            withContext(ioDispatcher) {
-                provider.getSeries(page = 1).items
-                    .filter { candidate ->
-                        candidate.id != detail.summary.id &&
-                            candidate.genres.any { it in genres }
-                    }
-                    .take(10)
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isLoadingDetail = false,
+                    error = ProviderError.NotFound,
+                )
             }
+            return
         }
         _state.update {
             it.copy(
                 isLoading = false,
+                isLoadingDetail = false,
                 series = detail,
-                selectedSeason = detail.seasons.firstOrNull()?.number ?: 1,
-                similar = similar.map(SimilarItem::SeriesItem),
+                selectedSeason = detail.seasons.firstOrNull()?.number
+                    ?: it.selectedSeason,
                 error = null,
             )
+        }
+
+        viewModelScope.launch {
+            val recommended = withContext(ioDispatcher) {
+                runCatching { provider.getSeriesRecommendations(detail.summary.id) }
+                    .getOrDefault(emptyList())
+            }
+            val similar = if (recommended.isNotEmpty()) {
+                recommended
+            } else {
+                val genres = detail.summary.genres
+                withContext(ioDispatcher) {
+                    provider.getSeries(page = 1).items
+                        .filter { candidate ->
+                            candidate.id != detail.summary.id &&
+                                candidate.genres.any { it in genres }
+                        }
+                        .take(10)
+                }
+            }
+            if (_state.value.series?.summary?.id == detail.summary.id) {
+                _state.update { it.copy(similar = similar.map(SimilarItem::SeriesItem)) }
+            }
         }
     }
 

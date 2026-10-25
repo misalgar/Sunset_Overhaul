@@ -263,12 +263,27 @@ fun DetailsScreen(
 
                         if (detail.seasons.isEmpty()) {
                             item(key = "no-episodes") {
-                                Text(
-                                    text = stringResource(R.string.details_episodes_coming_soon),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = SunsetColors.TextSecondary,
-                                    modifier = Modifier.padding(horizontal = gutter),
-                                )
+                                if (state.isLoadingDetail) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = gutter),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    ) {
+                                        repeat(3) {
+                                            SunsetSkeleton(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(72.dp),
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Text(
+                                        text = stringResource(R.string.details_episodes_coming_soon),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = SunsetColors.TextSecondary,
+                                        modifier = Modifier.padding(horizontal = gutter),
+                                    )
+                                }
                             }
                         }
                     }

@@ -274,6 +274,26 @@ and overview.
 Verified on the Fire TV: compact Home billboard, PPV screen with the 24/10/2026 label and events,
 PPV removed from Live, and a populated Deadpool “More like this” rail resolving to local titles.
 
+### 5.12 Fast detail rendering (2026-10-24)
+
+The series detail used to wait for all of `get_series_info`, TMDB series detail, up to three TMDB
+season requests and recommendations before leaving the full-screen skeleton. On the Fire TV that
+was a 10 s blue screen in the reported recording.
+
+- `getMovieSummary` / `getSeriesSummary` read the Room row and paint the hero immediately
+  (`isLoading = false`). The provider detail, episodes and enrichment then update the state.
+- Recommendations were moved to a separate coroutine, so the “More like this” rail no longer blocks
+  the hero.
+- `getSeriesDetail` no longer awaits TMDB series metadata or season stills; both run in the
+  provider's background scope. The first open shows provider data, and the next open shows the
+  enriched result.
+- While episodes are still loading, the series screen shows three compact skeletons under the hero
+  instead of a full-screen skeleton or “episodes coming soon”.
+
+Verified on the Fire TV: a warm open of “Fear the Walking Dead” paints the full hero in about 3 s
+(previously the series skeleton alone exceeded 10 s). The movie “The Virtuoso” also renders its
+hero before the recommendations rail.
+
 Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification
