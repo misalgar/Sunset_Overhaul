@@ -6,6 +6,7 @@ import com.markooverhaul.sunset.core.common.IoDispatcher
 import com.markooverhaul.sunset.core.data.repository.FavouritesRepository
 import com.markooverhaul.sunset.core.data.repository.ProgressRepository
 import com.markooverhaul.sunset.core.model.ContentProvider
+import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.model.EpgProgramme
 import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.model.Movie
@@ -62,7 +63,27 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             progressRepository.continueWatching.collect { progress ->
-                _state.update { it.copy(continueWatching = progress) }
+                val enriched = withContext(ioDispatcher) {
+                    progress.map { item ->
+                        val artwork = runCatching {
+                            when (item.contentType) {
+                                ContentType.MOVIE -> {
+                                    val movie = provider.getMovieSummary(item.contentId)
+                                    movie?.backdropUrl ?: movie?.posterUrl
+                                }
+
+                                ContentType.SERIES, ContentType.EPISODE -> {
+                                    val series = provider.getSeriesSummary(item.contentId)
+                                    series?.backdropUrl ?: series?.posterUrl
+                                }
+
+                                ContentType.LIVE -> null
+                            }
+                        }.getOrNull()
+                        item.copy(artworkUrl = artwork)
+                    }
+                }
+                _state.update { it.copy(continueWatching = enriched) }
             }
         }
         viewModelScope.launch {

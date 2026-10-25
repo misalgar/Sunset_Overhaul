@@ -153,6 +153,8 @@ data class WatchProgress(
     val durationMs: Long,
     val updatedAtUtcMs: Long,
     val completed: Boolean = false,
+    /** Catalogue backdrop/poster resolved for Home rails; not persisted. */
+    val artworkUrl: String? = null,
 ) {
     val fraction: Float
         get() = if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)

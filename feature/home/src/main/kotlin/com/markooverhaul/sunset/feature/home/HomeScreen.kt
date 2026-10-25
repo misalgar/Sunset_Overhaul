@@ -305,7 +305,7 @@ fun HomeScreen(
                         ) { progress, modifier ->
                             SunsetLandscapeCard(
                                 title = progress.title,
-                                imageUrl = null,
+                                imageUrl = progress.artworkUrl,
                                 onClick = { onResume(progress) },
                                 eyebrow = contentTypeLabel(progress.contentType),
                                 progress = progress.fraction,
@@ -467,7 +467,7 @@ private fun HeroSection(
         title = movie.title,
         synopsis = movie.plot,
         meta = meta,
-        imageUrl = movie.backdropUrl,
+        imageUrl = movie.backdropUrl ?: movie.posterUrl,
         primaryLabel = stringResource(if (resumable) R.string.action_resume else R.string.action_play),
         onPrimary = { if (progress != null && resumable) onResume(progress) else onPlay() },
         primaryButtonModifier = if (isTv) Modifier.focusRequester(focusRequester) else Modifier,

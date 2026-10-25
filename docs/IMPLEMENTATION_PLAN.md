@@ -315,6 +315,15 @@ in the rail, and Up from Recently added in Movies jumped to the hero.
 Verified on the Fire TV: Down from Live Now moves to the next rail, Up from Recently added returns
 to the rail above, and vertical movement no longer gets stuck or jumps to Play.
 
+### 5.14 Home artwork fallbacks (2026-10-24)
+
+- The Home billboard now uses `backdropUrl ?: posterUrl`, so a movie without a TMDB/provider
+  backdrop still gets artwork instead of a gradient monogram.
+- Continue Watching resolves the catalogue backdrop (or poster) for each progress entry and carries
+  it as a non-persisted `WatchProgress.artworkUrl`, so the landscape cards show real artwork.
+- Verified on the Fire TV: the hero shows the recent movie’s image and the South Park progress card
+  shows the series artwork.
+
 Next: catch-up playback, release binding, phone/tablet pass.
 
 ## 6. Verification
