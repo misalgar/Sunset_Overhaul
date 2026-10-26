@@ -130,6 +130,8 @@
     <string name="live_open_guide">Open TV Guide</string>
     <string name="live_guide_hint">Press ◀ for categories</string>
     <string name="live_now_playing">Now Playing</string>
+    <string name="live_event_scheduled">Upcoming event</string>
+    <string name="live_starts_at">Starts %1$s</string>
     <string name="live_group_genres">Genres</string>
     <string name="live_group_events">Live Events</string>
     <string name="live_group_countries">Countries &amp; Regions</string>
@@ -368,5 +370,6 @@
     <string name="details_episode_list">Episode list</string>
     <string name="guide_no_channels">No channels available.</string>
     <string name="live_no_guide">No guide data for this channel.</string>
+    <string name="player_event_scheduled">This event is scheduled for %1$s.</string>
     <string name="guide_programme_now_playing">Now playing</string>
 </resources>

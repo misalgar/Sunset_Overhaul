@@ -59,6 +59,8 @@ class RoutingContentProvider @Inject constructor(
     override suspend fun getLiveChannels(categoryId: String?): List<LiveChannel> =
         active.getLiveChannels(categoryId)
 
+    override fun cachedLiveChannels(): List<LiveChannel> = active.cachedLiveChannels()
+
     override suspend fun getGuide(days: Int): List<EpgProgramme> = active.getGuide(days)
 
     override suspend fun refreshLive() = active.refreshLive()

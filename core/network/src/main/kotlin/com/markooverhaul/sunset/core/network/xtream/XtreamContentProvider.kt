@@ -16,6 +16,7 @@ import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.model.EpgProgramme
 import com.markooverhaul.sunset.core.model.Episode
+import com.markooverhaul.sunset.core.model.LiveCategoryGroup
 import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.model.Movie
 import com.markooverhaul.sunset.core.model.PagedResult
@@ -31,6 +32,8 @@ import com.markooverhaul.sunset.core.model.StreamSource
 import com.markooverhaul.sunset.core.model.isAdultChannel
 import com.markooverhaul.sunset.core.model.isAdultName
 import com.markooverhaul.sunset.core.model.isInternalLiveCategory
+import com.markooverhaul.sunset.core.model.liveCategoryGroup
+import com.markooverhaul.sunset.core.model.parseLiveEventSchedule
 import com.markooverhaul.sunset.core.model.sanitizeProviderName
 import com.markooverhaul.sunset.core.network.tmdb.TmdbEnricher
 import java.text.SimpleDateFormat
@@ -183,6 +186,8 @@ class XtreamContentProvider @Inject constructor(
         val all = if (fresh) channels!! else loadChannels()
         if (categoryId.isNullOrBlank()) all else all.filter { categoryId in it.categoryIds }
     }
+
+    override fun cachedLiveChannels(): List<LiveChannel> = channels.orEmpty()
 
     override suspend fun getGuide(days: Int): List<EpgProgramme> {
         val windowDays = days.coerceIn(1, 7)
@@ -506,6 +511,10 @@ class XtreamContentProvider @Inject constructor(
         val internalCategoryIds = categoryNames
             .filterValues { isInternalLiveCategory(it) }
             .keys
+        // Event feeds carry their start time in the name; the panel clock/timezone come from the
+        // login response, so no extra request is needed.
+        val panelNowUtcMs = panelNowUtcMs()
+        val panelTimeZone = account?.serverInfo?.timezone
         val mapped = XtreamApi.json
             .decodeFromString<List<XtreamLiveStreamDto>>(body)
             .mapIndexedNotNull { index, dto ->
@@ -516,8 +525,22 @@ class XtreamContentProvider @Inject constructor(
                     rawName = dto.name,
                     categoryName = categoryName,
                 )
-                val displayName = sanitizeProviderName(resolved.name)
+                val cleanedName = sanitizeProviderName(resolved.name)
                     .ifBlank { "Channel ${dto.streamId}" }
+                val schedule = if (
+                    categoryName != null &&
+                    liveCategoryGroup(categoryName) == LiveCategoryGroup.LiveEvents
+                ) {
+                    parseLiveEventSchedule(
+                        rawName = cleanedName,
+                        categoryName = categoryName,
+                        panelNowUtcMs = panelNowUtcMs,
+                        panelTimeZoneId = panelTimeZone,
+                    )
+                } else {
+                    null
+                }
+                val displayName = schedule?.displayName?.takeIf { it.isNotBlank() } ?: cleanedName
                 LiveChannel(
                     id = dto.streamId,
                     name = displayName,
@@ -530,11 +553,25 @@ class XtreamContentProvider @Inject constructor(
                     catchUpDays = dto.tvArchiveDuration,
                     countryCode = resolved.countryCode,
                     isAdult = isAdultChannel(displayName, listOf(categoryName)),
+                    scheduledStartUtcMs = schedule?.startsAtUtcMs,
                 )
             }
         channels = mapped
         channelsFetchedAt = System.currentTimeMillis()
         return mapped
+    }
+
+    /** The panel's local "now" from the login response, used to interpret event name times. */
+    private fun panelNowUtcMs(): Long {
+        val info = account?.serverInfo ?: return System.currentTimeMillis()
+        val raw = info.timeNow.takeIf { it.isNotBlank() } ?: return System.currentTimeMillis()
+        val zone = info.timezone.takeIf { it.isNotBlank() } ?: TimeZone.getDefault().id
+        val parser = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone(zone)
+            isLenient = false
+        }
+        return runCatching { parser.parse(raw)?.time }.getOrNull()
+            ?: System.currentTimeMillis()
     }
 
     /**

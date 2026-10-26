@@ -27,6 +27,8 @@ data class LiveChannel(
     val countryCode: String? = null,
     /** Hidden app-wide except in the explicit Adultos row on Live TV. */
     val isAdult: Boolean = false,
+    /** Provider event schedule parsed from the name + dated category; null for 24/7 channels. */
+    val scheduledStartUtcMs: Long? = null,
 )
 
 data class EpgProgramme(
@@ -218,6 +220,13 @@ interface ContentProvider {
 
     suspend fun getLiveCategories(): List<Category>
     suspend fun getLiveChannels(categoryId: String? = null): List<LiveChannel>
+
+    /**
+     * Live channels already held in memory. Never triggers a provider request; used for surfaces
+     * (such as the player error screen) that only need an existing schedule hint.
+     */
+    fun cachedLiveChannels(): List<LiveChannel> = emptyList()
+
     suspend fun getGuide(days: Int = 1): List<EpgProgramme>
 
     /** Drops any short-lived live caches so the next read reflects a schedule/category change. */

@@ -121,6 +121,8 @@
     <string name="live_open_guide">Abrir guía TV</string>
     <string name="live_guide_hint">Pulsa ◀ para las categorías</string>
     <string name="live_now_playing">En emisión</string>
+    <string name="live_event_scheduled">Próximo evento</string>
+    <string name="live_starts_at">Empieza %1$s</string>
     <string name="live_group_genres">Géneros</string>
     <string name="live_group_events">Eventos en directo</string>
     <string name="live_group_countries">Países y regiones</string>
@@ -347,5 +349,6 @@
     <string name="details_episode_list">Lista de episodios</string>
     <string name="guide_no_channels">No hay canales disponibles.</string>
     <string name="live_no_guide">No hay datos de guía para este canal.</string>
+    <string name="player_event_scheduled">Este evento está programado para las %1$s.</string>
     <string name="guide_programme_now_playing">En emisión</string>
 </resources>

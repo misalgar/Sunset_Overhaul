@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,6 +68,7 @@ import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetSpacing
+import com.markooverhaul.sunset.core.model.LIVE_EVENT_START_GRACE_MS
 import com.markooverhaul.sunset.core.model.LiveCategoryGroup
 import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.ui.R
@@ -113,6 +115,14 @@ fun LiveScreen(
 ) {
     val isTv = LocalIsTelevision.current
     val entries = rememberFilterEntries(state)
+    // Event feeds switch from "Starts …" to LIVE on their own; a minute tick keeps labels honest.
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            nowMs = System.currentTimeMillis()
+        }
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isWide = isTv || maxWidth >= WideLayoutMinWidth
@@ -143,6 +153,7 @@ fun LiveScreen(
                     state = state,
                     entries = entries,
                     gutter = gutter,
+                    nowMs = nowMs,
                     onPlayChannel = onPlayChannel,
                     onOpenGuide = onOpenGuide,
                     onSelectFilter = onSelectFilter,
@@ -242,6 +253,7 @@ private fun LiveWideContent(
     state: LiveUiState,
     entries: List<LiveFilterEntry>,
     gutter: Dp,
+    nowMs: Long,
     onPlayChannel: (LiveChannel) -> Unit,
     onOpenGuide: () -> Unit,
     onSelectFilter: (LiveFilter) -> Unit,
@@ -417,10 +429,24 @@ private fun LiveWideContent(
                         key = { _, channel -> channel.id },
                     ) { index, channel ->
                         val programme = state.programmes[channel.id]?.now
-                        val progress = programme?.let {
-                            val span = (it.endUtcMs - it.startUtcMs).coerceAtLeast(1L)
-                            ((System.currentTimeMillis() - it.startUtcMs).toFloat() / span)
-                                .coerceIn(0f, 1f)
+                        val start = channel.scheduledStartUtcMs
+                        val scheduled = start != null &&
+                            nowMs < start - LIVE_EVENT_START_GRACE_MS
+                        val startsAtLabel = if (start != null && scheduled) {
+                            stringResource(
+                                R.string.live_starts_at,
+                                SunsetFormat.time(context, start),
+                            )
+                        } else {
+                            null
+                        }
+                        val progress = if (!scheduled) {
+                            programme?.let {
+                                val span = (it.endUtcMs - it.startUtcMs).coerceAtLeast(1L)
+                                ((nowMs - it.startUtcMs).toFloat() / span).coerceIn(0f, 1f)
+                            }
+                        } else {
+                            null
                         }
                         SunsetLiveChannelTile(
                             channel = channel,
@@ -429,12 +455,14 @@ private fun LiveWideContent(
                                 SunsetFormat.timeRange(context, it.startUtcMs, it.endUtcMs)
                             },
                             nowPlayingLabel = stringResource(R.string.live_now_playing),
+                            scheduledLabel = stringResource(R.string.live_event_scheduled),
                             isFavourite = channel.id in state.favourites,
                             favouriteLabel = stringResource(R.string.live_favourite),
                             unfavouriteLabel = stringResource(R.string.live_unfavourite),
                             onPlay = { onPlayChannel(channel) },
                             onToggleFavourite = { onToggleFavourite(channel) },
                             progress = progress,
+                            startsAtLabel = startsAtLabel,
                             modifier = Modifier
                                 .then(
                                     if (index == 0) {
@@ -566,7 +594,7 @@ private fun LiveSidebarFilterRow(
                     color = if (selected) SunsetColors.BgSurface3 else Color.Transparent,
                     shape = shape,
                 )
-                .padding(horizontal = SunsetSpacing.Md, vertical = SunsetSpacing.Sm),
+                .padding(horizontal = SunsetSpacing.Sm, vertical = SunsetSpacing.Sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Sm),
         ) {
@@ -591,7 +619,7 @@ private fun LiveSidebarFilterRow(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelLarge,
                 color = if (selected) SunsetColors.AccentPrimary else SunsetColors.TextSecondary,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(

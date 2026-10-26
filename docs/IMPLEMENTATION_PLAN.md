@@ -414,6 +414,29 @@ Adultos row (54 channels) and the guide button focus state.
 
 Next: channel availability/offline states, catch-up playback, release binding, phone/tablet pass.
 
+### 5.19 Advisory event schedules and full titles (2026-10-25)
+
+The panel's XMLTV payload has 973 channels but zero programmes, so every live tile used to claim
+LIVE — including event feeds such as `21;10 Tijuana vs Santos` that are not active yet.
+
+- `parseLiveEventSchedule` reads the leading panel time from the channel name (`:` or the panel's
+  occasional `;`), the date from the category (`NFL 25/10/26`) or a matching weekday (`Domingo`),
+  and converts it with the panel clock/timezone from `server_info`. It ignores names without a
+  time and weekday categories on the wrong day, and strips the time from the display name.
+- Cards show **Upcoming event** + `Starts 9:10 PM` (viewer's local time) ten minutes before the
+  start; otherwise the existing LIVE badge. There is deliberately no Ended state and playback is
+  never blocked — the stream remains the final authority (no probing, no extra requests).
+- The player failure overlay adds the scheduled time via a memory-only `cachedLiveChannels()`
+  lookup (no network call), so an early attempt explains itself.
+- Channel/event names in the tiles and category labels in the sidebar wrap to two lines, so
+  `Steelers vs. Saints`, `Los Angeles FC vs LA Galaxy` and `Live Soccer Domingo` are readable
+  without ellipses.
+
+Verified on the Fire TV: Tijuana vs Santos shows `Upcoming event / Starts 9:10 PM`, an earlier
+kick-off shows LIVE, and opening the upcoming feed reports `This event is scheduled for 9:10 PM.`
+
+Next: catch-up playback, release binding, phone/tablet pass.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

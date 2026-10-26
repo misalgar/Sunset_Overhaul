@@ -54,6 +54,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -242,6 +243,7 @@ fun PlayerScreen(
                 },
                 failure = playback.error,
                 live = state.live,
+                scheduledStartUtcMs = state.scheduledStartUtcMs,
                 selectedAction = errorAction,
                 onRetry = onRetry,
                 onExit = onExit,
@@ -495,10 +497,12 @@ private fun PlayerErrorOverlay(
     message: String,
     failure: PlaybackFailure?,
     live: Boolean,
+    scheduledStartUtcMs: Long?,
     selectedAction: PlayerErrorAction,
     onRetry: () -> Unit,
     onExit: () -> Unit,
 ) {
+    val context = LocalContext.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -537,6 +541,17 @@ private fun PlayerErrorOverlay(
                             PlaybackFailure.SERVER -> R.string.error_generic_body
                             PlaybackFailure.UNKNOWN -> R.string.error_unknown
                         },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SunsetColors.TextTertiary,
+                )
+            }
+            val scheduledStart = scheduledStartUtcMs
+            if (scheduledStart != null && scheduledStart > System.currentTimeMillis()) {
+                Text(
+                    text = stringResource(
+                        R.string.player_event_scheduled,
+                        SunsetFormat.time(context, scheduledStart),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = SunsetColors.TextTertiary,

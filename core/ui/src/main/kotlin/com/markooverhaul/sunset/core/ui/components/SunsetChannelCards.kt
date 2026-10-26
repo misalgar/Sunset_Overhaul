@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -206,6 +207,7 @@ fun SunsetLiveChannelTile(
     nowTitle: String?,
     timeRange: String?,
     nowPlayingLabel: String,
+    scheduledLabel: String,
     isFavourite: Boolean,
     favouriteLabel: String,
     unfavouriteLabel: String,
@@ -213,6 +215,7 @@ fun SunsetLiveChannelTile(
     onToggleFavourite: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    startsAtLabel: String? = null,
 ) {
     // A held Select arrives as repeated KeyDown events. The first repeat toggles the favourite and
     // the clickable's KeyUp click is swallowed, so the channel does not also start playing.
@@ -268,30 +271,50 @@ fun SunsetLiveChannelTile(
                         text = channel.name,
                         style = MaterialTheme.typography.titleMedium,
                         color = SunsetColors.TextPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = nowTitle ?: nowPlayingLabel,
+                        text = if (startsAtLabel != null) {
+                            scheduledLabel
+                        } else {
+                            nowTitle ?: nowPlayingLabel
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = SunsetColors.TextSecondary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        if (timeRange != null) {
+                        if (startsAtLabel != null) {
+                            Icon(
+                                imageVector = Icons.Rounded.Schedule,
+                                contentDescription = null,
+                                tint = SunsetColors.TextTertiary,
+                                modifier = Modifier.size(14.dp),
+                            )
                             Text(
-                                text = timeRange,
+                                text = startsAtLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = SunsetColors.TextTertiary,
                                 maxLines = 1,
                                 softWrap = false,
                             )
+                        } else {
+                            if (timeRange != null) {
+                                Text(
+                                    text = timeRange,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SunsetColors.TextTertiary,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                            LiveBadge()
                         }
-                        LiveBadge()
                     }
                 }
                 Icon(

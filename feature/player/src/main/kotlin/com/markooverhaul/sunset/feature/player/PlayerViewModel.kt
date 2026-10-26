@@ -34,6 +34,8 @@ data class PlayerUiState(
     val isResolving: Boolean = true,
     val resolveError: Throwable? = null,
     val resumeFromMs: Long = 0L,
+    /** Advisory event start for live feeds; null when unknown or not an event channel. */
+    val scheduledStartUtcMs: Long? = null,
 )
 
 /**
@@ -134,7 +136,13 @@ class PlayerViewModel @Inject constructor(
     }
 
     private suspend fun start() {
-        _state.update { it.copy(isResolving = true, resolveError = null) }
+        _state.update {
+            it.copy(
+                isResolving = true,
+                resolveError = null,
+                scheduledStartUtcMs = if (live) scheduledStartOf(contentId) else null,
+            )
+        }
         try {
             val startPosition = if (live) 0L else withContext(ioDispatcher) { resumePosition() }
             _state.update { it.copy(resumeFromMs = startPosition) }
@@ -159,8 +167,13 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private suspend fun resumePosition(): Long {
-        val saved = progressRepository.get(contentId) ?: return 0L
+    /** In-memory lookup only; the player must never trigger a live-channel request. */
+    private fun scheduledStartOf(channelId: String): Long? =
+        provider.cachedLiveChannels()
+            .firstOrNull { channel -> channel.id == channelId }
+            ?.scheduledStartUtcMs
+
+    private suspend fun resumePosition(): Long {        val saved = progressRepository.get(contentId) ?: return 0L
         if (saved.completed) return 0L
         if (saved.fraction < WatchProgress.MIN_RESUME_FRACTION) return 0L
         if (saved.fraction >= WatchProgress.COMPLETE_FRACTION) return 0L
