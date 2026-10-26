@@ -7,7 +7,6 @@ import com.markooverhaul.sunset.core.data.repository.AuthRepository
 import com.markooverhaul.sunset.core.data.repository.SettingsRepository
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.ProviderError
-import com.markooverhaul.sunset.core.model.ProviderStatus
 import com.markooverhaul.sunset.core.model.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -34,9 +33,9 @@ data class AppUiState(
 /**
  * Application bootstrap and global preferences.
  *
- * Release builds fail closed: when the provider reports [ProviderStatus.NotConfigured] the app
- * renders "Service not configured" and never fabricates a session. Debug builds may start a
- * synthetic local demo session so the offline catalogue is immediately demonstrable.
+ * Release builds bind the live provider, which is "not configured" until the viewer signs in;
+ * that state now leads to the login screen. [StartupState.ServiceNotConfigured] is reserved for a
+ * provider that cannot be used at all or reports it during session restore.
  */
 @HiltViewModel
 class AppViewModel @Inject constructor(
@@ -65,10 +64,6 @@ class AppViewModel @Inject constructor(
     fun bootstrap() {
         viewModelScope.launch {
             _state.update { it.copy(startup = StartupState.Loading) }
-            if (provider.status is ProviderStatus.NotConfigured && !BuildConfig.DEBUG) {
-                _state.update { it.copy(startup = StartupState.ServiceNotConfigured) }
-                return@launch
-            }
             try {
                 restoreOrStart()
             } catch (cancelled: CancellationException) {

@@ -63,7 +63,7 @@
     <string name="offline_banner">Sin conexión. Se muestra información guardada.</string>
     <string name="demo_mode_banner">Versión de demostración: datos locales, sin llamadas al proveedor</string>
     <string name="service_not_configured_title">Servicio no configurado</string>
-    <string name="service_not_configured_body">El servicio Sunset aún no está conectado. La integración con el proveedor está bloqueada hasta que se apruebe el acceso a la API. No se hará ninguna llamada a producción.</string>
+    <string name="service_not_configured_body">Sunset no puede conectar con un proveedor de contenido en esta versión. Comprueba tu conexión y vuelve a abrir la app.</string>
     <string name="placeholder_notice">Pantalla de marcador de posición para el hito de base.</string>
     <string name="error_network_title">No pudimos conectar con Sunset</string>
     <string name="error_network_body">Comprueba tu conexión e inténtalo de nuevo. El contenido guardado sigue disponible.</string>

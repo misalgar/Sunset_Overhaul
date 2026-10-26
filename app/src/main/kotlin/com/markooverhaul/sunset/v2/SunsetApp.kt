@@ -62,7 +62,8 @@ fun SunsetApp(
                     }
                 }
 
-                UpdateHost(enabled = state.startup == StartupState.Ready)
+                // Check even before login: a broken startup must still be able to receive a fix.
+                UpdateHost(enabled = state.startup != StartupState.Loading)
             }
         }
     }

@@ -68,7 +68,7 @@
     <string name="offline_banner">You are offline. Showing cached information.</string>
     <string name="demo_mode_banner">Demo build — local sample data, no provider calls</string>
     <string name="service_not_configured_title">Service not configured</string>
-    <string name="service_not_configured_body">The Sunset service is not connected yet. Provider integration is blocked until API access is approved. No production calls will be made.</string>
+    <string name="service_not_configured_body">Sunset can\'t reach a content provider in this build. Check your connection and reopen the app.</string>
     <string name="placeholder_notice">Placeholder screen for the foundation milestone.</string>
     <string name="error_network_title">We could not reach Sunset</string>
     <string name="error_network_body">Check your connection and try again. Your cached content is still available.</string>

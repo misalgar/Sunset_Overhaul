@@ -474,7 +474,23 @@ The family/friends distribution is now a signed release with an in-app updater; 
 Pending publish: upload `build/release-artifacts/sunset-0.1.0.apk` to the GitHub release tag
 `v0.1.0`, then commit/push `latest.json` from the releases repo.
 
-Next: publish the first release, catch-up playback, phone/tablet pass.
+### 5.22 Release startup fix (2026-10-26)
+
+The first signed release (0.1.0) showed **Service not configured** on a fresh TV instead of the
+login screen. `AppViewModel.bootstrap()` still applied the old fail-closed rule: a
+`ProviderStatus.NotConfigured` provider meant a blocked build. The release now binds the live
+`XtreamContentProvider`, which reports NotConfigured until credentials exist — so the gate ran
+before login and never fell through to it.
+
+- Removed the startup gate; no stored session now always reaches the login screen. The
+  `ServiceNotConfigured` state remains only for a provider that fails during session restore.
+- The daily OTA check now starts as soon as bootstrap resolves, not only after login, so a future
+  pre-login regression can still receive a fix.
+- Built **0.1.1** (`versionCode` 2), signed with the same keystore; manifest updated to 0.1.1.
+- 0.1.0 cannot self-update because it never reaches the update check: install 0.1.1 manually once
+  on the affected TV. Subsequent releases use OTA normally.
+
+Next: publish 0.1.1, catch-up playback, phone/tablet pass.
 
 ## 6. Verification
 
