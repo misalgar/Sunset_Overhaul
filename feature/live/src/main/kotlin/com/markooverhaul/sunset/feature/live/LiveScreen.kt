@@ -72,6 +72,7 @@ import com.markooverhaul.sunset.core.model.LIVE_EVENT_START_GRACE_MS
 import com.markooverhaul.sunset.core.model.LiveCategoryGroup
 import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.ui.R
+import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelRow
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.SunsetLiveChannelTile
@@ -266,19 +267,18 @@ private fun LiveWideContent(
     val gridState = rememberLazyGridState()
     val selectedCategoryRequester = remember { FocusRequester() }
     val firstChannelRequester = remember { FocusRequester() }
+    val entryFocus = LocalContentEntryFocus.current
     var previewFilter by remember { mutableStateOf<LiveFilter?>(null) }
 
     val genreLabel = stringResource(R.string.live_group_genres)
     val eventsLabel = stringResource(R.string.live_group_events)
     val countriesLabel = stringResource(R.string.live_group_countries)
 
-    // Pinned rows first, then headers for Genres / Live Events / Countries. The provider's daily
-    // sports feeds therefore no longer sit between the user and the standard categories.
-    val sidebarRows = remember(entries, genreLabel, eventsLabel, countriesLabel) {
+    // All/Favourites stay pinned above the scrolling category list so Down from the top nav always
+    // has an "All channels" target. Live Events is the first group (see LiveCategoryGroup order).
+    val pinnedEntries = entries.filter { it.group == null && it.filter != LiveFilter.Adult }
+    val categoryRows = remember(entries, genreLabel, eventsLabel, countriesLabel) {
         buildList {
-            entries
-                .filter { it.group == null && it.filter != LiveFilter.Adult }
-                .forEach { add(LiveSidebarRow.Filter(it)) }
             var currentGroup: LiveCategoryGroup? = null
             entries.filter { it.group != null }.forEach { entry ->
                 val group = entry.group ?: return@forEach
@@ -304,9 +304,6 @@ private fun LiveWideContent(
     }
 
     val selectedEntry = entries.firstOrNull { it.filter == state.selectedFilter } ?: entries.first()
-    val selectedRowIndex = sidebarRows.indexOfFirst {
-        it is LiveSidebarRow.Filter && it.entry.filter == state.selectedFilter
-    }.coerceAtLeast(0)
 
     // Focusing a category previews it after a short pause, so fast D-pad travel does not rebuild
     // the grid for every row it passes through.
@@ -324,11 +321,20 @@ private fun LiveWideContent(
     }
 
     suspend fun focusSelectedCategory() {
-        // Only scroll when the selected row is actually off-screen. animateScrollToItem always
-        // snaps the row to the top, which made the list visibly jump on every Left from the grid.
-        val visible = sidebarState.layoutInfo.visibleItemsInfo.any { it.index == selectedRowIndex }
-        if (!visible) {
-            runCatching { sidebarState.animateScrollToItem(selectedRowIndex) }
+        if (state.selectedFilter == LiveFilter.All) {
+            (entryFocus ?: selectedCategoryRequester).requestFocusWhenReady()
+            return
+        }
+        val index = categoryRows.indexOfFirst {
+            it is LiveSidebarRow.Filter && it.entry.filter == state.selectedFilter
+        }
+        if (index >= 0) {
+            // Only scroll when the selected row is actually off-screen. animateScrollToItem always
+            // snaps the row to the top, which made the list visibly jump on every Left.
+            val visible = sidebarState.layoutInfo.visibleItemsInfo.any { it.index == index }
+            if (!visible) {
+                runCatching { sidebarState.animateScrollToItem(index) }
+            }
         }
         selectedCategoryRequester.requestFocusWhenReady()
     }
@@ -364,6 +370,30 @@ private fun LiveWideContent(
             ) {
                 LiveGuideButton(onClick = onOpenGuide)
 
+                Column(verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Xs)) {
+                    pinnedEntries.forEach { entry ->
+                        LiveSidebarFilterRow(
+                            entry = entry,
+                            selected = state.selectedFilter == entry.filter,
+                            focusRequester = when {
+                                entry.filter == LiveFilter.All ->
+                                    entryFocus ?: selectedCategoryRequester
+                                state.selectedFilter == entry.filter -> selectedCategoryRequester
+                                else -> null
+                            },
+                            onFocused = { previewFilter = entry.filter },
+                            onClick = {
+                                onSelectFilter(entry.filter)
+                                scope.launch { focusFirstChannel() }
+                            },
+                            onRight = {
+                                onSelectFilter(entry.filter)
+                                scope.launch { focusFirstChannel() }
+                            },
+                        )
+                    }
+                }
+
                 LazyColumn(
                     state = sidebarState,
                     modifier = Modifier
@@ -372,7 +402,7 @@ private fun LiveWideContent(
                     verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Xs),
                     contentPadding = PaddingValues(bottom = SunsetSpacing.Sm),
                 ) {
-                    items(sidebarRows, key = { it.key }) { row ->
+                    items(categoryRows, key = { it.key }) { row ->
                         when (row) {
                             is LiveSidebarRow.Header -> LiveSidebarHeader(label = row.label)
                             is LiveSidebarRow.Filter -> LiveSidebarFilterRow(

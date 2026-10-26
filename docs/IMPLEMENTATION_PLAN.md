@@ -499,18 +499,22 @@ Four navigation/loading rough edges reported after the first releases:
 - **Live Events first:** `LiveCategoryGroup` now orders LiveEvents, Genres, Countries, so the dated
   sports feeds sit directly under All/Favourites instead of below every genre.
 - **No sidebar jump:** Left from the grid only scrolls the sidebar when the selected category is
-  off-screen. Previously `animateScrollToItem` always snapped it to the top.
+  off-screen. Previously `animateScrollToItem` always snapped it to the top. All/Favourites are
+  also pinned above the scrolling category list, so they stay visible.
 - **Down from the top nav lands on All:** MainShell provides a content-entry `FocusRequester`; the
-  nav's Down handler requests it. `SunsetFilterRow` (Movies/Series) and the PPV/MyList All chips
-  attach it, so entering those screens no longer follows the nearest geometric chip
-  (`Estrenos Septiembre`).
+  nav's Down handler requests it. `SunsetFilterRow` (Movies/Series), the Live All row, and the
+  PPV/MyList All chips attach it, so entering those screens no longer follows the nearest
+  geometric chip (`Estrenos Septiembre`).
 - **Home loading rails:** `HomeUiState` exposes `loadingLive`, `loadingCatalogue` and
   `becauseLoading`; Home renders titled skeleton rails (and a hero skeleton) until each part of the
   first catalogue sync completes, instead of leaving sections invisible.
 
-Checks: debug build, 41 unit tests, lint 0 errors. On-device verification is pending.
+Checks: debug build, 41 unit tests, lint 0 errors. Fire TV verified: Live Events first, Down from
+the nav focuses All, Left from the grid leaves the sidebar position unchanged, and Movies Down
+lands on All. The Home skeletons were not captured because the cached catalogue loaded too fast;
+they appear during the first-login catalogue sync.
 
-Next: verify on the Fire TV, then publish 0.1.2.
+Next: verify the Home skeletons on a fresh login, then publish 0.1.2.
 
 ## 6. Verification
 
