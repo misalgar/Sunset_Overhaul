@@ -581,6 +581,29 @@ Dream (`ESP`/`SUB`) and the other variants now carry clear badges.
 
 Next: group variants under one card with a details version picker.
 
+### 5.27 Release 0.1.2 (2026-10-26)
+
+Release contents since 0.1.1:
+
+- Live TV card and sidebar polish: compact live dot with programme titles, deep slate cards,
+  white logo badges, calm inset progress bar, Live Events first, `Soccer • Day`, single-line
+  aligned sidebar labels, grid-only categories hint.
+- Home: titled loading rails, Home row focus recovery, deterministic Down from the top nav.
+- Guide: single EPG-unavailable banner; the provider's guide data has since returned.
+- Search: Back returns focus to the search box.
+- Provider language/quality badges (`LAT`, `SUB`, `ESP`, `4K`) with a DB v3 migration and one-time
+  catalogue resync.
+- OTA startup check before login.
+
+Built as version `0.1.2` (`versionCode` 3), signed with the Sunset release key. Artifact:
+`build/release-artifacts/sunset-0.1.2.apk`, SHA-256
+`990b77a70dd14bd3ad6db5c5bcd87830e418365ef033f2313c311e02ec3d6d47`.
+
+Publish: create the `v0.1.2` GitHub release with the APK, then push the updated `latest.json`.
+0.1.1 clients will prompt; 0.1.0 clients still need one manual install.
+
+Checks: `testDebugUnitTest` (45 tests), `assembleDebug`, lint 0 errors.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
