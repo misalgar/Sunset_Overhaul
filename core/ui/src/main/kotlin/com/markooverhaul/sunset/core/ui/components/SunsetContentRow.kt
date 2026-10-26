@@ -9,6 +9,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -37,6 +40,11 @@ fun <T> SunsetContentRow(
     if (items.isEmpty()) return
     val isTv = LocalIsTelevision.current
     val state = rememberLazyListState()
+    // Focus the card the viewer can actually see in this row. After horizontal scrolling, item 0
+    // may not be composed, which used to make Up/Down unable to focus the row at all.
+    val firstVisibleIndex by remember {
+        derivedStateOf { state.firstVisibleItemIndex }
+    }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -57,7 +65,10 @@ fun <T> SunsetContentRow(
             ),
         ) {
             itemsIndexed(items = items, key = { _, item -> key(item) }) { index, item ->
-                val itemModifier = if (index == 0 && firstItemFocusRequester != null) {
+                val itemModifier = if (
+                    index == firstVisibleIndex &&
+                    firstItemFocusRequester != null
+                ) {
                     Modifier.focusRequester(firstItemFocusRequester)
                 } else {
                     Modifier

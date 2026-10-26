@@ -516,6 +516,26 @@ they appear during the first-login catalogue sync.
 
 Next: verify the Home skeletons on a fresh login, then publish 0.1.2.
 
+### 5.24 Home row focus recovery (2026-10-26)
+
+After scrolling Home and moving Right/Left inside *Recently added in Series*, Up stopped working.
+The row focus key was cleared when the old card reported focus loss after the new card had already
+reported focus gain; Up then fell through to geometric search and found nothing above.
+
+- Home tracks the **focused item identity** (`rowKey` + item key). Only the item that still owns
+  focus can clear the row state, so moving within a LazyRow no longer loses the row.
+- `SunsetContentRow` attaches the row focus requester to the **first visible card** rather than
+  index 0, so a horizontally scrolled row can still be entered with Up/Down.
+- The Home hero Play button reuses the shared nav entry requester, making Down from the top bar
+  deterministic (the previous missing target left focus on the nav).
+
+Fire TV verified: series → Right ×2 → Left → Up focuses *Recently added in Movies*; a second Up
+focuses *Recommended for you*. Home → Down from the nav focuses the hero Play button.
+
+Checks: debug build, 41 unit tests, lint 0 errors.
+
+Next: publish 0.1.2, catch-up playback, phone/tablet pass.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

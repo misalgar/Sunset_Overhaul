@@ -47,6 +47,7 @@ import com.markooverhaul.sunset.core.model.SeriesSummary
 import com.markooverhaul.sunset.core.model.WatchProgress
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelCard
+import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.core.ui.components.SunsetContentRow
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.SunsetHeroBillboard
@@ -129,7 +130,10 @@ fun HomeScreen(
         // TV rails are laid out vertically, but Compose's geometric focus search tends to keep
         // moving sideways inside a LazyRow. Explicit up/down links make Down go to the next row and
         // Up return to the row above instead of jumping to the hero.
-        val heroFocus = remember { FocusRequester() }
+        // The nav's Down key targets this requester. Home attaches it to the hero Play button so
+        // entering Home from the top bar is deterministic, and row navigation reuses the same one.
+        val entryFocus = LocalContentEntryFocus.current
+        val heroFocus = remember(entryFocus) { entryFocus ?: FocusRequester() }
         var initialHeroFocusApplied by remember { mutableStateOf(false) }
         LaunchedEffect(state.hero?.id, isTv) {
             if (isTv && state.hero != null && !initialHeroFocusApplied) {
@@ -174,13 +178,23 @@ fun HomeScreen(
         val listState = rememberLazyListState()
         val scope = rememberCoroutineScope()
         var focusedRowKey by remember { mutableStateOf<String?>(null) }
+        var focusedItem by remember { mutableStateOf<Pair<String, Any>?>(null) }
         val heroItemOffset = if (state.hero != null || state.loadingCatalogue) 1 else 0
 
-        fun itemFocusModifier(key: String, modifier: Modifier): Modifier = modifier.onFocusChanged {
-            if (it.isFocused) {
-                focusedRowKey = key
-            } else if (focusedRowKey == key) {
-                focusedRowKey = null
+        fun itemFocusModifier(
+            rowKey: String,
+            itemKey: Any,
+            modifier: Modifier,
+        ): Modifier = modifier.onFocusChanged { focusState ->
+            val identity = rowKey to itemKey
+            if (focusState.isFocused) {
+                focusedRowKey = rowKey
+                focusedItem = identity
+            } else if (focusedItem == identity) {
+                // A focus move within the same LazyRow can deliver the new item's focus before the
+                // old item's loss. Only the item that still owns focus may clear the row state.
+                focusedItem = null
+                if (focusedRowKey == rowKey) focusedRowKey = null
             }
         }
 
@@ -338,7 +352,11 @@ fun HomeScreen(
                                 eyebrow = contentTypeLabel(progress.contentType),
                                 progress = progress.fraction,
                                 width = if (isTv) 240.dp else 200.dp,
-                                modifier = itemFocusModifier("continue", modifier),
+                                modifier = itemFocusModifier(
+                                    "continue",
+                                    progress.contentId + progress.episodeId.orEmpty(),
+                                    modifier,
+                                ),
                             )
                         }
                     }
@@ -378,7 +396,7 @@ fun HomeScreen(
                                         .coerceIn(0f, 1f)
                                 },
                                 width = if (isTv) 240.dp else 220.dp,
-                                modifier = itemFocusModifier("live", modifier),
+                                modifier = itemFocusModifier("live", channel.id, modifier),
                             )
                         }
                     }
@@ -415,7 +433,11 @@ fun HomeScreen(
                                 year = item.year,
                                 subtitle = item.subtitle,
                                 width = posterWidth,
-                                modifier = itemFocusModifier("because", modifier),
+                                modifier = itemFocusModifier(
+                                    "because",
+                                    item.type.name + item.id,
+                                    modifier,
+                                ),
                             )
                         }
                     }
@@ -449,7 +471,7 @@ fun HomeScreen(
                                 movie,
                                 posterWidth,
                                 onOpenDetails,
-                                itemFocusModifier("discovery", modifier),
+                                itemFocusModifier("discovery", movie.id, modifier),
                             )
                         }
                     }
@@ -479,7 +501,7 @@ fun HomeScreen(
                                 movie,
                                 posterWidth,
                                 onOpenDetails,
-                                itemFocusModifier("recentMovies", modifier),
+                                itemFocusModifier("recentMovies", movie.id, modifier),
                             )
                         }
                     }
@@ -509,7 +531,7 @@ fun HomeScreen(
                                 series,
                                 posterWidth,
                                 onOpenDetails,
-                                itemFocusModifier("recentSeries", modifier),
+                                itemFocusModifier("recentSeries", series.id, modifier),
                             )
                         }
                     }
@@ -533,7 +555,11 @@ fun HomeScreen(
                                 year = card.year,
                                 subtitle = card.subtitle,
                                 width = posterWidth,
-                                modifier = itemFocusModifier("saved", modifier),
+                                modifier = itemFocusModifier(
+                                    "saved",
+                                    card.type.name + card.id,
+                                    modifier,
+                                ),
                             )
                         }
                     }
