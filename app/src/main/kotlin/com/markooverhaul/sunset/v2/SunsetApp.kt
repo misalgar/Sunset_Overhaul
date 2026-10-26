@@ -2,6 +2,7 @@ package com.markooverhaul.sunset.v2
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import com.markooverhaul.sunset.feature.account.LoginRoute
 import com.markooverhaul.sunset.v2.ui.MainShell
 import com.markooverhaul.sunset.v2.ui.ServiceNotConfiguredScreen
 import com.markooverhaul.sunset.v2.ui.SplashScreen
+import com.markooverhaul.sunset.v2.update.UpdateHost
 
 @Composable
 fun SunsetApp(
@@ -43,20 +45,24 @@ fun SunsetApp(
             modifier = Modifier.fillMaxSize(),
             color = SunsetColors.BgBase,
         ) {
-            when (state.startup) {
-                StartupState.Loading -> SplashScreen(demoMode = BuildConfig.DEBUG)
-                StartupState.ServiceNotConfigured -> ServiceNotConfiguredScreen()
-                StartupState.NeedsLogin -> LoginRoute(
-                    onSignedIn = viewModel::onSignedIn,
-                    demoMode = BuildConfig.DEBUG,
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (state.startup) {
+                    StartupState.Loading -> SplashScreen(demoMode = BuildConfig.DEBUG)
+                    StartupState.ServiceNotConfigured -> ServiceNotConfiguredScreen()
+                    StartupState.NeedsLogin -> LoginRoute(
+                        onSignedIn = viewModel::onSignedIn,
+                        demoMode = BuildConfig.DEBUG,
+                    )
 
-                // The demo banner must follow the actual session: a live panel is not demo data.
-                StartupState.Ready -> CompositionLocalProvider(
-                    LocalDemoMode provides (state.session?.isDemo == true),
-                ) {
-                    MainShell(demoMode = state.session?.isDemo == true)
+                    // The demo banner must follow the actual session: a live panel is not demo data.
+                    StartupState.Ready -> CompositionLocalProvider(
+                        LocalDemoMode provides (state.session?.isDemo == true),
+                    ) {
+                        MainShell(demoMode = state.session?.isDemo == true)
+                    }
                 }
+
+                UpdateHost(enabled = state.startup == StartupState.Ready)
             }
         }
     }

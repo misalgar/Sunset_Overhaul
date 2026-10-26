@@ -1,7 +1,11 @@
 package com.markooverhaul.sunset.v2.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -11,6 +15,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.model.LiveChannel
+import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.feature.account.LoginRoute
 import com.markooverhaul.sunset.feature.details.DetailsRoute
 import com.markooverhaul.sunset.feature.details.DetailsViewModel
@@ -31,6 +36,8 @@ import com.markooverhaul.sunset.feature.settings.AboutScreen
 import com.markooverhaul.sunset.feature.settings.SettingsRoute
 import com.markooverhaul.sunset.v2.BuildConfig
 import com.markooverhaul.sunset.v2.ui.MoreScreen
+import com.markooverhaul.sunset.v2.update.UpdateMessage
+import com.markooverhaul.sunset.v2.update.UpdateViewModel
 
 @Composable
 fun SunsetNavHost(
@@ -229,6 +236,21 @@ fun SunsetNavHost(
         }
 
         composable(SunsetRoutes.SETTINGS) {
+            val updateViewModel: UpdateViewModel = hiltViewModel()
+            val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+            val updateStatus = when {
+                updateState.checking -> stringResource(R.string.update_checking)
+                updateState.available != null -> stringResource(R.string.update_available_status)
+                updateState.error != null -> stringResource(R.string.update_check_failed)
+                updateState.message == UpdateMessage.UpToDate -> stringResource(R.string.update_up_to_date)
+                updateState.message == UpdateMessage.DebugBuild -> stringResource(R.string.update_debug_only)
+                BuildConfig.DEBUG -> stringResource(R.string.update_debug_only)
+                else -> stringResource(
+                    R.string.about_version_format,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                )
+            }
             SettingsRoute(
                 onBack = { navController.popBackStack() },
                 onOpenAbout = { navController.navigate(SunsetRoutes.ABOUT) },
@@ -243,6 +265,8 @@ fun SunsetNavHost(
                 demoMode = demoMode,
                 versionName = BuildConfig.VERSION_NAME,
                 versionCode = BuildConfig.VERSION_CODE,
+                updateStatus = updateStatus,
+                onCheckForUpdates = updateViewModel::checkNow,
             )
         }
 

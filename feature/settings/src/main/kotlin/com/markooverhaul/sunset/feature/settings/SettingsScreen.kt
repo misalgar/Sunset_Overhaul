@@ -61,6 +61,8 @@ fun SettingsRoute(
     demoMode: Boolean,
     versionName: String,
     versionCode: Int,
+    updateStatus: String,
+    onCheckForUpdates: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -74,6 +76,7 @@ fun SettingsRoute(
         state = state,
         demoMode = demoMode,
         versionLabel = stringResource(R.string.about_version_format, versionName, versionCode),
+        updateStatus = updateStatus,
         onBack = onBack,
         onAutoplayChange = viewModel::setAutoplayNext,
         onSubtitlesChange = viewModel::setSubtitlesEnabled,
@@ -83,6 +86,7 @@ fun SettingsRoute(
         onOpenParental = onOpenParental,
         onOpenProfiles = onOpenProfiles,
         onOpenAbout = onOpenAbout,
+        onCheckForUpdates = onCheckForUpdates,
         modifier = modifier,
     )
 }
@@ -92,6 +96,7 @@ fun SettingsScreen(
     state: SettingsUiState,
     demoMode: Boolean,
     versionLabel: String,
+    updateStatus: String,
     onBack: () -> Unit,
     onAutoplayChange: (Boolean) -> Unit,
     onSubtitlesChange: (Boolean) -> Unit,
@@ -101,6 +106,7 @@ fun SettingsScreen(
     onOpenParental: () -> Unit,
     onOpenProfiles: () -> Unit,
     onOpenAbout: () -> Unit,
+    onCheckForUpdates: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isTv = LocalIsTelevision.current
@@ -276,6 +282,11 @@ fun SettingsScreen(
                         SettingsNavRow(
                             title = stringResource(R.string.nav_profiles),
                             onClick = onOpenProfiles,
+                        )
+                        SettingsNavRow(
+                            title = stringResource(R.string.update_check),
+                            subtitle = updateStatus,
+                            onClick = onCheckForUpdates,
                         )
                         SettingsNavRow(
                             title = stringResource(R.string.settings_about),

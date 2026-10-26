@@ -9,6 +9,7 @@ import org.gradle.api.tasks.TaskAction
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
@@ -22,6 +23,17 @@ val localProperties = Properties().apply {
 val providerHostValue = localProperties.getProperty("sunset.provider.host")?.trim().orEmpty()
 val tmdbReadToken = localProperties.getProperty("tmdb.read.token")?.trim().orEmpty()
 val tmdbApiKey = localProperties.getProperty("tmdb.api.key")?.trim().orEmpty()
+val otaManifestUrl = localProperties.getProperty("sunset.ota.manifest")?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: "https://raw.githubusercontent.com/misalgar/sunset_overhaul-releases/main/latest.json"
+val releaseStoreFile = localProperties.getProperty("sunset.signing.storeFile")?.trim().orEmpty()
+val releaseStorePassword = localProperties.getProperty("sunset.signing.storePassword")?.trim().orEmpty()
+val releaseKeyAlias = localProperties.getProperty("sunset.signing.keyAlias")?.trim().orEmpty()
+val releaseKeyPassword = localProperties.getProperty("sunset.signing.keyPassword")?.trim().orEmpty()
+val hasReleaseSigning = releaseStoreFile.isNotEmpty() &&
+    releaseStorePassword.isNotEmpty() &&
+    releaseKeyAlias.isNotEmpty() &&
+    releaseKeyPassword.isNotEmpty()
 
 abstract class GenerateNetworkSecurityConfig : DefaultTask() {
     @get:Input
@@ -69,7 +81,9 @@ androidComponents {
         val taskName = "generate${variant.name.replaceFirstChar { it.uppercase() }}NetworkSecurityConfig"
         val generateConfig = tasks.register<GenerateNetworkSecurityConfig>(taskName) {
             providerHost.set(providerHostValue)
-            allowAllCleartext.set(variant.buildType == "debug")
+            // The panel is HTTP-only and redirects to rotating raw-IP hosts. A static allowlist is
+            // not viable, and the release APK is sideloaded, so cleartext is permitted app-wide.
+            allowAllCleartext.set(true)
             outputDir.set(layout.buildDirectory.dir("generated/res/networkSecurityConfig/${variant.name}"))
         }
         variant.sources.res?.addGeneratedSourceDirectory(
@@ -88,7 +102,7 @@ android {
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
-        versionName = "0.1.0-foundation"
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -96,6 +110,18 @@ android {
         // Machine-local TMDB credentials; never committed. Empty values disable enrichment.
         buildConfigField("String", "TMDB_READ_TOKEN", "\"${tmdbReadToken.replace("\"", "\\\"")}\"")
         buildConfigField("String", "TMDB_API_KEY", "\"${tmdbApiKey.replace("\"", "\\\"")}\"")
+        buildConfigField("String", "OTA_MANIFEST_URL", "\"${otaManifestUrl.replace("\"", "\\\"")}\"")
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildFeatures {
@@ -109,9 +135,11 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            // Kept off for the scaffold so stack traces stay readable during review.
-            // Enable and tune rules before any production build; see docs/IMPLEMENTATION_PLAN.md.
+            // Kept off for now so stack traces stay readable during the family/friends phase.
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -165,6 +193,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

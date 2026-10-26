@@ -453,6 +453,29 @@ panel.
 
 Next: catch-up playback, release binding, phone/tablet pass.
 
+### 5.21 Signed release and in-app OTA (2026-10-25)
+
+The family/friends distribution is now a signed release with an in-app updater; full procedure in
+`docs/RELEASING.md`.
+
+- Release binds the production `XtreamContentProvider` (no demo router), allows the panel's HTTP
+  hosts, and is signed from a keystore outside the repo (`sunset.signing.*` in untracked
+  `local.properties`). Version `0.1.0` (`versionCode` 1), R8 off.
+- `UpdateManager` checks a public `latest.json` once per day (plus Settings → Check for updates),
+  downloads the APK, verifies SHA-256 and the signing certificate against the installed app, then
+  hands it to the Fire TV installer. The update UX is a D-pad dialog with notes, Install and Later.
+- Manifest: `https://raw.githubusercontent.com/misalgar/sunset_overhaul-releases/main/latest.json`;
+  APKs live as assets on `misalgar/sunset_overhaul-releases`.
+- `scripts/build-release.ps1` builds, verifies, copies the artifact, computes the hash and rewrites
+  the releases repo manifest in one step.
+- Verified locally: signed `app-release.apk` with the Sunset certificate, 41 unit tests, lint
+  0 errors. No device test was performed because the TV is in use.
+
+Pending publish: upload `build/release-artifacts/sunset-0.1.0.apk` to the GitHub release tag
+`v0.1.0`, then commit/push `latest.json` from the releases repo.
+
+Next: publish the first release, catch-up playback, phone/tablet pass.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
