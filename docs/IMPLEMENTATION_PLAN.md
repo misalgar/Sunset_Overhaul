@@ -543,16 +543,17 @@ Checks: debug build, 41 unit tests, lint 0 errors.
   white 50 dp logo badge so JPEG logos with white backgrounds look intentional.
 - **Progress:** the bottom bar is inset 12 dp / 4 dp and uses translucent white rather than yellow,
   so it cannot be mistaken for the focus ring.
-- **Sidebar:** Genres now precede Live Events; `Live Soccer <Day>` becomes `Soccer • <Day>`; labels
-  are single-line and rows, headers and pinned filters share a 12 dp left margin.
+- **Sidebar:** Live Events now precedes Genres again; `Live Soccer <Day>` becomes
+  `Soccer • <Day>`; labels are single-line and rows, headers and pinned filters share a 12 dp left
+  margin.
 - **Hint:** “Press ◀ for categories” only appears while focus is inside the channel grid.
 - **Logo:** the symbol is now a clean inverted triangle with a negative-space sun; the tiny `S` and
   horizon cut-line are gone.
 - **Update dialog:** the primary action retries focus over the first frames after the modal opens,
   so the first Select lands on Install.
 
-Fire TV verified: new card surface, dot + full show titles, white logo badges, Genres-first sidebar,
-and the hint appearing only from the grid.
+Fire TV verified: new card surface, dot + full show titles, white logo badges, Live-Events-first
+sidebar, and the hint appearing only from the grid.
 
 Checks: `assembleDebug`, `testDebugUnitTest` (41 tests), lint 0 errors.
 
