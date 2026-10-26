@@ -37,6 +37,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markooverhaul.sunset.core.designsystem.components.SunsetEmptyState
 import com.markooverhaul.sunset.core.designsystem.components.SunsetErrorState
+import com.markooverhaul.sunset.core.designsystem.components.SunsetSectionHeader
 import com.markooverhaul.sunset.core.designsystem.components.SunsetSkeleton
 import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.model.ContentType
@@ -159,10 +160,21 @@ fun HomeScreen(
             if (state.recentSeries.isNotEmpty()) add("recentSeries")
             if (saved.isNotEmpty()) add("saved")
         }
+        // Includes the skeleton items so scroll fallbacks address the correct lazy-list index
+        // while individual sections are still loading.
+        val sectionKeys = buildList {
+            if (state.continueWatching.isNotEmpty()) add("continue")
+            if (state.loadingLive || state.liveNow.isNotEmpty()) add("live")
+            if (state.becauseLoading || state.becauseItems.isNotEmpty()) add("because")
+            if (state.loadingCatalogue || discovery.isNotEmpty()) add("discovery")
+            if (state.loadingCatalogue || state.recentMovies.isNotEmpty()) add("recentMovies")
+            if (state.loadingCatalogue || state.recentSeries.isNotEmpty()) add("recentSeries")
+            if (saved.isNotEmpty()) add("saved")
+        }
         val listState = rememberLazyListState()
         val scope = rememberCoroutineScope()
         var focusedRowKey by remember { mutableStateOf<String?>(null) }
-        val heroItemOffset = if (state.hero != null) 1 else 0
+        val heroItemOffset = if (state.hero != null || state.loadingCatalogue) 1 else 0
 
         fun itemFocusModifier(key: String, modifier: Modifier): Modifier = modifier.onFocusChanged {
             if (it.isFocused) {
@@ -173,7 +185,7 @@ fun HomeScreen(
         }
 
         fun rowItemIndex(key: String): Int =
-            1 + heroItemOffset + visibleRowKeys.indexOf(key)
+            1 + heroItemOffset + sectionKeys.indexOf(key)
 
         fun focusRow(key: String) {
             val index = rowItemIndex(key)
@@ -299,6 +311,15 @@ fun HomeScreen(
                             onDetails = { onOpenDetails(ContentType.MOVIE, hero.id) },
                         )
                     }
+                } else if (state.loadingCatalogue) {
+                    item(key = "hero-skeleton") {
+                        SunsetSkeleton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(heroHeight),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
+                        )
+                    }
                 }
 
                 if (state.continueWatching.isNotEmpty()) {
@@ -323,7 +344,16 @@ fun HomeScreen(
                     }
                 }
 
-                if (state.liveNow.isNotEmpty()) {
+                if (state.loadingLive) {
+                    item(key = "live-skeleton") {
+                        SectionSkeleton(
+                            title = stringResource(R.string.home_row_live_now),
+                            gutter = gutter,
+                            cardWidth = if (isTv) 240.dp else 220.dp,
+                            cardHeight = if (isTv) 176.dp else 166.dp,
+                        )
+                    }
+                } else if (state.liveNow.isNotEmpty()) {
                     item(key = "live") {
                         SunsetContentRow(
                             title = stringResource(R.string.home_row_live_now),
@@ -354,7 +384,19 @@ fun HomeScreen(
                     }
                 }
 
-                if (state.becauseItems.isNotEmpty()) {
+                if (state.becauseLoading) {
+                    item(key = "because-skeleton") {
+                        SectionSkeleton(
+                            title = stringResource(
+                                R.string.home_row_because,
+                                state.becauseTitle.orEmpty(),
+                            ),
+                            gutter = gutter,
+                            cardWidth = posterWidth,
+                            cardHeight = posterWidth * 1.5f + 88.dp,
+                        )
+                    }
+                } else if (state.becauseItems.isNotEmpty()) {
                     item(key = "because") {
                         SunsetContentRow(
                             title = stringResource(
@@ -379,7 +421,18 @@ fun HomeScreen(
                     }
                 }
 
-                if (discovery.isNotEmpty()) {
+                if (state.loadingCatalogue) {
+                    item(key = "discovery-skeleton") {
+                        SectionSkeleton(
+                            title = stringResource(
+                                if (hasHistory) R.string.home_row_recommended else R.string.home_row_new_on_sunset,
+                            ),
+                            gutter = gutter,
+                            cardWidth = posterWidth,
+                            cardHeight = posterWidth * 1.5f + 88.dp,
+                        )
+                    }
+                } else if (discovery.isNotEmpty()) {
                     item(key = "discovery") {
                         SunsetContentRow(
                             title = stringResource(
@@ -402,7 +455,16 @@ fun HomeScreen(
                     }
                 }
 
-                if (state.recentMovies.isNotEmpty()) {
+                if (state.loadingCatalogue) {
+                    item(key = "recent-movies-skeleton") {
+                        SectionSkeleton(
+                            title = stringResource(R.string.home_row_recent_movies),
+                            gutter = gutter,
+                            cardWidth = posterWidth,
+                            cardHeight = posterWidth * 1.5f + 88.dp,
+                        )
+                    }
+                } else if (state.recentMovies.isNotEmpty()) {
                     item(key = "recent-movies") {
                         SunsetContentRow(
                             title = stringResource(R.string.home_row_recent_movies),
@@ -423,7 +485,16 @@ fun HomeScreen(
                     }
                 }
 
-                if (state.recentSeries.isNotEmpty()) {
+                if (state.loadingCatalogue) {
+                    item(key = "recent-series-skeleton") {
+                        SectionSkeleton(
+                            title = stringResource(R.string.home_row_recent_series),
+                            gutter = gutter,
+                            cardWidth = posterWidth,
+                            cardHeight = posterWidth * 1.5f + 88.dp,
+                        )
+                    }
+                } else if (state.recentSeries.isNotEmpty()) {
                     item(key = "recent-series") {
                         SunsetContentRow(
                             title = stringResource(R.string.home_row_recent_series),
@@ -548,6 +619,33 @@ private fun SeriesPoster(
         width = width,
         modifier = modifier,
     )
+}
+
+@Composable
+private fun SectionSkeleton(
+    title: String,
+    gutter: androidx.compose.ui.unit.Dp,
+    cardWidth: androidx.compose.ui.unit.Dp,
+    cardHeight: androidx.compose.ui.unit.Dp,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SunsetSectionHeader(
+            title = title,
+            modifier = Modifier.padding(horizontal = gutter),
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = gutter),
+        ) {
+            items(5) {
+                SunsetSkeleton(
+                    modifier = Modifier
+                        .width(cardWidth)
+                        .height(cardHeight),
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -18,8 +18,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -32,6 +35,12 @@ import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.ui.R
 
+/**
+ * Entry point for Down from the top navigation. MainShell provides a requester; each top-level
+ * screen attaches it to the item that should receive focus (usually the All chip).
+ */
+val LocalContentEntryFocus = staticCompositionLocalOf<FocusRequester?> { null }
+
 /** Horizontal category filters with an All chip. Shared by Live, Movies and Series. */
 @Composable
 fun SunsetFilterRow(
@@ -41,6 +50,7 @@ fun SunsetFilterRow(
     modifier: Modifier = Modifier,
     gutter: Dp = 16.dp,
 ) {
+    val entryFocus = LocalContentEntryFocus.current
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -51,6 +61,11 @@ fun SunsetFilterRow(
                 text = stringResource(R.string.filter_all),
                 selected = selectedId == null,
                 onClick = { onSelect(null) },
+                modifier = if (entryFocus != null) {
+                    Modifier.focusRequester(entryFocus)
+                } else {
+                    Modifier
+                },
             )
         }
         items(items = categories, key = { it.id }) { category ->

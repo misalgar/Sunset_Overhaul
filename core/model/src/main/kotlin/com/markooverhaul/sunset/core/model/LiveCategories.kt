@@ -81,7 +81,7 @@ fun isAdultChannel(name: String, categoryNames: Iterable<String?>): Boolean =
     isAdultName(name) || categoryNames.any { it != null && isAdultName(it) }
 
 /** Sidebar grouping: pinned filters are UI-level; provider categories fall into these buckets. */
-enum class LiveCategoryGroup { Genres, LiveEvents, Countries }
+enum class LiveCategoryGroup { LiveEvents, Genres, Countries }
 
 private val EventDate = Regex("""\b\d{1,2}/\d{1,2}/\d{2,4}\b""")
 private val EventKeywords = listOf(

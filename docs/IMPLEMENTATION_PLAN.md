@@ -492,6 +492,26 @@ before login and never fell through to it.
 
 Next: publish 0.1.1, catch-up playback, phone/tablet pass.
 
+### 5.23 Live ordering, nav entry focus and Home skeletons (2026-10-26)
+
+Four navigation/loading rough edges reported after the first releases:
+
+- **Live Events first:** `LiveCategoryGroup` now orders LiveEvents, Genres, Countries, so the dated
+  sports feeds sit directly under All/Favourites instead of below every genre.
+- **No sidebar jump:** Left from the grid only scrolls the sidebar when the selected category is
+  off-screen. Previously `animateScrollToItem` always snapped it to the top.
+- **Down from the top nav lands on All:** MainShell provides a content-entry `FocusRequester`; the
+  nav's Down handler requests it. `SunsetFilterRow` (Movies/Series) and the PPV/MyList All chips
+  attach it, so entering those screens no longer follows the nearest geometric chip
+  (`Estrenos Septiembre`).
+- **Home loading rails:** `HomeUiState` exposes `loadingLive`, `loadingCatalogue` and
+  `becauseLoading`; Home renders titled skeleton rails (and a hero skeleton) until each part of the
+  first catalogue sync completes, instead of leaving sections invisible.
+
+Checks: debug build, 41 unit tests, lint 0 errors. On-device verification is pending.
+
+Next: verify on the Fire TV, then publish 0.1.2.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

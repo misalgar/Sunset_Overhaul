@@ -29,10 +29,18 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -47,6 +55,7 @@ import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.ui.R
+import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.v2.navigation.SunsetNavHost
 import com.markooverhaul.sunset.v2.navigation.SunsetRoutes
 
@@ -121,6 +130,9 @@ fun MainShell(
 
     val showTopBar = isLargeScreen && currentRoute in LargeTopLevel
     val showBottomBar = !isLargeScreen && currentRoute in PhoneTopLevel
+    // Screens attach this to their first focusable item so Down from the nav is deterministic
+    // instead of following the nearest geometric chip.
+    val contentEntryFocus = remember { FocusRequester() }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -130,6 +142,7 @@ fun MainShell(
                 LargeScreenTopBar(
                     isTv = isTv,
                     currentRoute = currentRoute,
+                    contentEntryFocus = contentEntryFocus,
                     onNavigate = { route -> navController.navigateTopLevel(route) },
                 )
             }
@@ -143,11 +156,13 @@ fun MainShell(
             }
         },
     ) { padding ->
-        SunsetNavHost(
-            navController = navController,
-            demoMode = demoMode,
-            modifier = Modifier.padding(padding),
-        )
+        CompositionLocalProvider(LocalContentEntryFocus provides contentEntryFocus) {
+            SunsetNavHost(
+                navController = navController,
+                demoMode = demoMode,
+                modifier = Modifier.padding(padding),
+            )
+        }
     }
 }
 
@@ -155,6 +170,7 @@ fun MainShell(
 private fun LargeScreenTopBar(
     isTv: Boolean,
     currentRoute: String,
+    contentEntryFocus: FocusRequester,
     onNavigate: (String) -> Unit,
 ) {
     val gutter = if (isTv) 48.dp else 24.dp
@@ -169,7 +185,15 @@ private fun LargeScreenTopBar(
         SunsetWordmark(symbolSize = if (isTv) 32.dp else 28.dp)
         Spacer(modifier = Modifier.width(if (isTv) 32.dp else 20.dp))
         LazyRow(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                        runCatching { contentEntryFocus.requestFocus() }.isSuccess
+                    } else {
+                        false
+                    }
+                },
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

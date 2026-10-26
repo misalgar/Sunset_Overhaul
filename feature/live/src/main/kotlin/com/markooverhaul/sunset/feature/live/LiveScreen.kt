@@ -324,7 +324,12 @@ private fun LiveWideContent(
     }
 
     suspend fun focusSelectedCategory() {
-        runCatching { sidebarState.animateScrollToItem(selectedRowIndex) }
+        // Only scroll when the selected row is actually off-screen. animateScrollToItem always
+        // snaps the row to the top, which made the list visibly jump on every Left from the grid.
+        val visible = sidebarState.layoutInfo.visibleItemsInfo.any { it.index == selectedRowIndex }
+        if (!visible) {
+            runCatching { sidebarState.animateScrollToItem(selectedRowIndex) }
+        }
         selectedCategoryRequester.requestFocusWhenReady()
     }
 

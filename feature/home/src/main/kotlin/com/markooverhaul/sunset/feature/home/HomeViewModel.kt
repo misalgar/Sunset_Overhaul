@@ -41,6 +41,9 @@ data class HomeRailItem(
 
 data class HomeUiState(
     val isLoading: Boolean = true,
+    val loadingLive: Boolean = true,
+    val loadingCatalogue: Boolean = true,
+    val becauseLoading: Boolean = false,
     val hero: Movie? = null,
     val liveNow: List<LiveChannel> = emptyList(),
     val recentMovies: List<Movie> = emptyList(),
@@ -54,8 +57,8 @@ data class HomeUiState(
     val error: Throwable? = null,
 ) {
     val isEmpty: Boolean
-        get() = !isLoading && error == null && hero == null &&
-            liveNow.isEmpty() && recentMovies.isEmpty() && recentSeries.isEmpty()
+        get() = !isLoading && !loadingLive && !loadingCatalogue && error == null &&
+            hero == null && liveNow.isEmpty() && recentMovies.isEmpty() && recentSeries.isEmpty()
 }
 
 @HiltViewModel
@@ -111,7 +114,14 @@ class HomeViewModel @Inject constructor(
     fun refresh() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update {
+                it.copy(
+                    isLoading = true,
+                    loadingLive = true,
+                    loadingCatalogue = true,
+                    error = null,
+                )
+            }
             try {
                 val now = System.currentTimeMillis()
                 coroutineScope {
@@ -127,6 +137,7 @@ class HomeViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             isLoading = false,
+                            loadingLive = false,
                             liveNow = visibleChannels.take(10),
                             error = null,
                         )
@@ -140,6 +151,7 @@ class HomeViewModel @Inject constructor(
                         val recentMovies = movies.sortedByDescending { it.addedAtUtcMs }.take(12)
                         _state.update {
                             it.copy(
+                                loadingCatalogue = false,
                                 hero = recentMovies.firstOrNull() ?: it.hero,
                                 recentMovies = recentMovies,
                                 recentSeries = series.sortedByDescending { s -> s.addedAtUtcMs }
@@ -159,7 +171,14 @@ class HomeViewModel @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
-                _state.update { it.copy(isLoading = false, error = error) }
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        loadingLive = false,
+                        loadingCatalogue = false,
+                        error = error,
+                    )
+                }
             }
         }
     }
@@ -169,41 +188,49 @@ class HomeViewModel @Inject constructor(
         becauseAnchorId = progress.contentId
         becauseJob?.cancel()
         becauseJob = viewModelScope.launch {
-            val items = withContext(ioDispatcher) {
-                when (progress.contentType) {
-                    ContentType.MOVIE -> provider.getMovieRecommendations(progress.contentId)
-                        .map { movie ->
-                            HomeRailItem(
-                                id = movie.id,
-                                type = ContentType.MOVIE,
-                                title = movie.title,
-                                posterUrl = movie.posterUrl,
-                                year = movie.year,
-                                subtitle = movie.genres.firstOrNull(),
-                            )
-                        }
-
-                    ContentType.SERIES, ContentType.EPISODE ->
-                        provider.getSeriesRecommendations(progress.contentId)
-                            .map { series ->
+            _state.update { it.copy(becauseLoading = true, becauseTitle = progress.title) }
+            try {
+                val items = withContext(ioDispatcher) {
+                    when (progress.contentType) {
+                        ContentType.MOVIE -> provider.getMovieRecommendations(progress.contentId)
+                            .map { movie ->
                                 HomeRailItem(
-                                    id = series.id,
-                                    type = ContentType.SERIES,
-                                    title = series.title,
-                                    posterUrl = series.posterUrl,
-                                    year = series.year,
-                                    subtitle = series.genres.firstOrNull(),
+                                    id = movie.id,
+                                    type = ContentType.MOVIE,
+                                    title = movie.title,
+                                    posterUrl = movie.posterUrl,
+                                    year = movie.year,
+                                    subtitle = movie.genres.firstOrNull(),
                                 )
                             }
 
-                    ContentType.LIVE -> emptyList()
+                        ContentType.SERIES, ContentType.EPISODE ->
+                            provider.getSeriesRecommendations(progress.contentId)
+                                .map { series ->
+                                    HomeRailItem(
+                                        id = series.id,
+                                        type = ContentType.SERIES,
+                                        title = series.title,
+                                        posterUrl = series.posterUrl,
+                                        year = series.year,
+                                        subtitle = series.genres.firstOrNull(),
+                                    )
+                                }
+
+                        ContentType.LIVE -> emptyList()
+                    }
                 }
-            }
-            _state.update {
-                it.copy(
-                    becauseTitle = progress.title,
-                    becauseItems = items,
-                )
+                _state.update {
+                    it.copy(
+                        becauseLoading = false,
+                        becauseTitle = progress.title,
+                        becauseItems = items,
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                _state.update { it.copy(becauseLoading = false) }
             }
         }
     }

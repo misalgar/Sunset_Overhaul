@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.ui.R
+import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.core.ui.components.SunsetArtwork
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
@@ -74,6 +76,7 @@ fun MyListScreen(
     val isTv = LocalIsTelevision.current
     val gutter = if (isTv) 48.dp else 16.dp
     val visible = state.visibleItems
+    val entryFocus = LocalContentEntryFocus.current
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -100,6 +103,11 @@ fun MyListScreen(
                         text = stringResource(R.string.mylist_filter_all),
                         selected = state.filter == MyListFilter.ALL,
                         onClick = { onSelectFilter(MyListFilter.ALL) },
+                        modifier = if (entryFocus != null) {
+                            Modifier.focusRequester(entryFocus)
+                        } else {
+                            Modifier
+                        },
                     )
                 }
                 item(key = "movies") {

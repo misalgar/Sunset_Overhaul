@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -24,6 +25,7 @@ import com.markooverhaul.sunset.core.designsystem.components.SunsetSkeleton
 import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.ui.R
+import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelRow
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.util.SunsetFormat
@@ -60,6 +62,7 @@ fun PpvScreen(
     val isTv = LocalIsTelevision.current
     val context = LocalContext.current
     val gutter = if (isTv) 48.dp else 16.dp
+    val entryFocus = LocalContentEntryFocus.current
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -88,6 +91,11 @@ fun PpvScreen(
                         text = stringResource(R.string.ppv_all_events),
                         selected = state.selectedCategoryId == null,
                         onClick = { onSelectCategory(null) },
+                        modifier = if (entryFocus != null) {
+                            Modifier.focusRequester(entryFocus)
+                        } else {
+                            Modifier
+                        },
                     )
                 }
                 items(state.categories, key = { it.id }) { category ->
