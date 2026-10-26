@@ -1,6 +1,7 @@
 package com.markooverhaul.sunset.feature.guide
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -229,6 +231,16 @@ fun GuideScreen(
             gridFocus = gridFocus,
         )
 
+        // The panel currently publishes channels without programmes. Explain it once instead of
+        // repeating "No guide data" on every row.
+        val epgUnavailable = !state.isLoading &&
+            state.error == null &&
+            state.visibleChannels.isNotEmpty() &&
+            state.programmes.isEmpty()
+        if (epgUnavailable) {
+            GuideEpgUnavailableBanner(gutter = gutter)
+        }
+
         when {
             state.isLoading -> GuideLoading(gutter = gutter)
 
@@ -280,6 +292,7 @@ fun GuideScreen(
                             striped = index % 2 == 0,
                             scrollState = horizontalState,
                             firstRow = index == 0,
+                            showNoDataLabel = !epgUnavailable,
                             gridFocus = gridFocus,
                             tabFocus = activeTabFocus,
                             onFocusProgramme = { programme ->
@@ -299,6 +312,33 @@ fun GuideScreen(
             selectedCountry = state.selectedCountry,
             onSelect = onSelectCountry,
             onDismiss = onDismissCountryPicker,
+        )
+    }
+}
+
+@Composable
+private fun GuideEpgUnavailableBanner(gutter: Dp) {
+    val shape = RoundedCornerShape(SunsetRadius.Sm)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = gutter, vertical = SunsetSpacing.Sm)
+            .background(SunsetColors.BgSurface2, shape)
+            .border(1.dp, SunsetColors.BorderSubtle, shape)
+            .padding(horizontal = SunsetSpacing.Md, vertical = SunsetSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Sm),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Info,
+            contentDescription = null,
+            tint = SunsetColors.TextTertiary,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = stringResource(R.string.guide_epg_unavailable),
+            style = MaterialTheme.typography.bodySmall,
+            color = SunsetColors.TextSecondary,
         )
     }
 }
@@ -1029,6 +1069,7 @@ private fun GuideChannelRow(
     striped: Boolean,
     scrollState: androidx.compose.foundation.ScrollState,
     firstRow: Boolean,
+    showNoDataLabel: Boolean,
     gridFocus: FocusRequester,
     tabFocus: FocusRequester,
     onFocusProgramme: (EpgProgramme) -> Unit,
@@ -1123,10 +1164,10 @@ private fun GuideChannelRow(
                         text = channel.name,
                         style = MaterialTheme.typography.bodySmall,
                         color = SunsetColors.TextSecondary,
-                        maxLines = if (programmes.isEmpty()) 1 else 2,
+                        maxLines = if (programmes.isEmpty() && showNoDataLabel) 1 else 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (programmes.isEmpty()) {
+                    if (programmes.isEmpty() && showNoDataLabel) {
                         Text(
                             text = stringResource(R.string.guide_no_data_short),
                             style = MaterialTheme.typography.labelSmall,

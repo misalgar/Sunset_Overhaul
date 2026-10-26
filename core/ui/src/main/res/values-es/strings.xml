@@ -347,6 +347,7 @@
     <string name="details_episode_list">Lista de episodios</string>
     <string name="guide_no_channels">No hay canales disponibles.</string>
     <string name="live_no_guide">No hay datos de guía para este canal.</string>
+    <string name="guide_epg_unavailable">El proveedor no ofrece datos de guía. Los canales se pueden seguir viendo.</string>
     <string name="player_event_scheduled">Este evento está programado para las %1$s.</string>
     <string name="guide_programme_now_playing">En emisión</string>
 </resources>

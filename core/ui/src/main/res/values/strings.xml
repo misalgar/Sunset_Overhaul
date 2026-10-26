@@ -368,6 +368,7 @@
     <string name="details_episode_list">Episode list</string>
     <string name="guide_no_channels">No channels available.</string>
     <string name="live_no_guide">No guide data for this channel.</string>
+    <string name="guide_epg_unavailable">Guide data isn\'t available from the provider. Channels are still playable.</string>
     <string name="player_event_scheduled">This event is scheduled for %1$s.</string>
     <string name="guide_programme_now_playing">Now playing</string>
 </resources>

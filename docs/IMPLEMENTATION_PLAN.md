@@ -437,6 +437,22 @@ kick-off shows LIVE, and opening the upcoming feed reports `This event is schedu
 
 Next: catch-up playback, release binding, phone/tablet pass.
 
+### 5.20 Guide EPG outage banner (2026-10-25)
+
+The panel's `xmltv.php` feed shrank from the ~3.2 MB document recorded in `198ed58` (channels and
+`<programme>` entries) to a 152 KB channels-only file. A fresh fetch after deleting the cache
+returned 976 `<channel>` entries and **0 `<programme>` entries**, so the Guide correctly has no
+schedule cells. The same account shows no listings in another IPTV app, confirming a provider-side
+change; `get_short_epg` / `get_simple_data_table` were already known to return no listings on this
+panel.
+
+- The Guide now shows one “Guide data isn't available from the provider. Channels are still
+  playable.” banner above the ruler when the loaded guide has no programmes.
+- Per-row “No guide data” labels are suppressed in that state; channel names use the freed space.
+- Rows, logos, day tabs, country filter and the time ruler remain functional.
+
+Next: catch-up playback, release binding, phone/tablet pass.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
