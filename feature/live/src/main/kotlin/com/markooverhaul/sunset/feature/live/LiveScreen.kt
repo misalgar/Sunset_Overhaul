@@ -451,11 +451,6 @@ private fun LiveWideContent(
                         SunsetLiveChannelTile(
                             channel = channel,
                             nowTitle = programme?.title,
-                            timeRange = programme?.let {
-                                SunsetFormat.timeRange(context, it.startUtcMs, it.endUtcMs)
-                            },
-                            nowPlayingLabel = stringResource(R.string.live_now_playing),
-                            scheduledLabel = stringResource(R.string.live_event_scheduled),
                             isFavourite = channel.id in state.favourites,
                             favouriteLabel = stringResource(R.string.live_favourite),
                             unfavouriteLabel = stringResource(R.string.live_unfavourite),

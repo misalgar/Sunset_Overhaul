@@ -63,6 +63,21 @@ class LiveCategoriesTest {
     }
 
     @Test
+    fun `turns category dates into readable labels`() {
+        val october = java.text.DateFormatSymbols.getInstance()
+            .shortMonths[9]
+            .trimEnd('.')
+        assertEquals("NFL • $october 25", cleanCategoryDisplayName("NFL 25/10/26"))
+        assertEquals("MLB • $october 26", cleanCategoryDisplayName(" MLB 26/10/2026 "))
+        assertEquals(
+            "NFL • $october 25",
+            cleanCategoryDisplayName("NFL 25/10/26 (presiona boton update)"),
+        )
+        assertEquals("Live Soccer Domingo", cleanCategoryDisplayName("Live Soccer Domingo"))
+        assertEquals("Canales 24/7", cleanCategoryDisplayName("Canales 24/7"))
+    }
+
+    @Test
     fun `groups daily sports feeds as live events`() {
         assertEquals(LiveCategoryGroup.LiveEvents, liveCategoryGroup("MLB 26/10/26"))
         assertEquals(LiveCategoryGroup.LiveEvents, liveCategoryGroup("NFL 25/10/26"))

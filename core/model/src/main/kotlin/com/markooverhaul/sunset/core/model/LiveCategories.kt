@@ -27,6 +27,25 @@ fun sanitizeProviderName(raw: String): String = raw
     .replace(RepeatedWhitespace, " ")
     .trim()
 
+private val CategoryDate = Regex("""\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b""")
+
+/**
+ * Category names read like panel data (`NFL 25/10/26`). The sidebar shows the friendly form
+ * (`NFL • Oct 25`) while the raw name stays available for schedule parsing and PPV detection.
+ */
+fun cleanCategoryDisplayName(raw: String): String {
+    val months = java.text.DateFormatSymbols.getInstance().shortMonths
+    return CategoryDate.replace(sanitizeProviderName(raw)) { match ->
+        val day = match.groupValues[1].toIntOrNull()
+        val month = match.groupValues[2].toIntOrNull()
+        if (day == null || month == null || month !in 1..12 || day !in 1..31) {
+            match.value
+        } else {
+            "• ${months[month - 1].trimEnd('.')} $day"
+        }
+    }.replace(RepeatedWhitespace, " ").trim()
+}
+
 /** Internal/admin categories that must never be offered as viewing choices. */
 fun isInternalLiveCategory(raw: String): Boolean {
     val value = raw.trim()

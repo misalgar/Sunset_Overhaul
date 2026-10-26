@@ -120,8 +120,6 @@
     <string name="live_channels">Canales</string>
     <string name="live_open_guide">Abrir guía TV</string>
     <string name="live_guide_hint">Pulsa ◀ para las categorías</string>
-    <string name="live_now_playing">En emisión</string>
-    <string name="live_event_scheduled">Próximo evento</string>
     <string name="live_starts_at">Empieza %1$s</string>
     <string name="live_group_genres">Géneros</string>
     <string name="live_group_events">Eventos en directo</string>

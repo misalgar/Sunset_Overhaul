@@ -32,6 +32,7 @@ import com.markooverhaul.sunset.core.model.StreamSource
 import com.markooverhaul.sunset.core.model.isAdultChannel
 import com.markooverhaul.sunset.core.model.isAdultName
 import com.markooverhaul.sunset.core.model.isInternalLiveCategory
+import com.markooverhaul.sunset.core.model.cleanCategoryDisplayName
 import com.markooverhaul.sunset.core.model.liveCategoryGroup
 import com.markooverhaul.sunset.core.model.parseLiveEventSchedule
 import com.markooverhaul.sunset.core.model.sanitizeProviderName
@@ -161,7 +162,7 @@ class XtreamContentProvider @Inject constructor(
         val mapped = XtreamApi.json
             .decodeFromString<List<XtreamCategoryDto>>(body)
             .mapIndexed { index, dto ->
-                val name = sanitizeProviderName(dto.name)
+                val name = cleanCategoryDisplayName(dto.name)
                 Category(
                     id = dto.id,
                     type = CategoryType.LIVE,

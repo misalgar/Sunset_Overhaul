@@ -1,6 +1,8 @@
 package com.markooverhaul.sunset.core.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,9 +38,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.markooverhaul.sunset.core.designsystem.components.LiveBadge
 import com.markooverhaul.sunset.core.designsystem.components.SunsetFocusable
@@ -197,17 +201,16 @@ fun SunsetChannelRow(
 }
 
 /**
- * Dense live tile for the 2-column TV grid: a framed 64 dp logo, name, current programme,
- * time + LIVE status, a bottom progress bar and a favourite indicator. Holding Select toggles the
+ * Dense live tile for the 2-column TV grid. The card has a strict 76 dp height so every row in the
+ * grid aligns, a 56 dp framed logo, a 17/15 sp two-line title, and a single status row with the
+ * LIVE badge (or the scheduled start) next to the current programme. Holding Select toggles the
  * favourite without adding a second focus stop.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SunsetLiveChannelTile(
     channel: LiveChannel,
     nowTitle: String?,
-    timeRange: String?,
-    nowPlayingLabel: String,
-    scheduledLabel: String,
     isFavourite: Boolean,
     favouriteLabel: String,
     unfavouriteLabel: String,
@@ -220,7 +223,14 @@ fun SunsetLiveChannelTile(
     // A held Select arrives as repeated KeyDown events. The first repeat toggles the favourite and
     // the clickable's KeyUp click is swallowed, so the channel does not also start playing.
     var longPressHandled by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
+    var titleOverflows by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(SunsetRadius.Sm)
+    val titleStyle = MaterialTheme.typography.bodyLarge.copy(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = if (channel.name.length > 24) 15.sp else 17.sp,
+        lineHeight = if (channel.name.length > 24) 18.sp else 20.sp,
+    )
     SunsetFocusable(
         onClick = {
             if (longPressHandled) {
@@ -229,7 +239,10 @@ fun SunsetLiveChannelTile(
                 onPlay()
             }
         },
-        onFocusChanged = { focused -> if (!focused) longPressHandled = false },
+        onFocusChanged = { isFocused ->
+            focused = isFocused
+            if (!isFocused) longPressHandled = false
+        },
         modifier = modifier
             .onPreviewKeyEvent { event ->
                 val selectKey = event.key == Key.DirectionCenter || event.key == Key.Enter
@@ -249,45 +262,41 @@ fun SunsetLiveChannelTile(
         shape = shape,
         scaleOnFocus = false,
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(76.dp)
                 .background(SunsetColors.BgSurface2),
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 84.dp)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 FramedChannelLogo(name = channel.name, logoUrl = channel.logoUrl)
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
                         text = channel.name,
-                        style = MaterialTheme.typography.titleMedium,
+                        modifier = if (focused && titleOverflows) {
+                            Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                        } else {
+                            Modifier
+                        },
+                        style = titleStyle,
                         color = SunsetColors.TextPrimary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = if (startsAtLabel != null) {
-                            scheduledLabel
-                        } else {
-                            nowTitle ?: nowPlayingLabel
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SunsetColors.TextSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { result -> titleOverflows = result.hasVisualOverflow },
                     )
                     Row(
+                        modifier = Modifier.padding(top = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (startsAtLabel != null) {
                             Icon(
@@ -304,16 +313,16 @@ fun SunsetLiveChannelTile(
                                 softWrap = false,
                             )
                         } else {
-                            if (timeRange != null) {
-                                Text(
-                                    text = timeRange,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = SunsetColors.TextTertiary,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                )
-                            }
                             LiveBadge()
+                        }
+                        if (!nowTitle.isNullOrBlank()) {
+                            Text(
+                                text = nowTitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SunsetColors.TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
@@ -328,6 +337,7 @@ fun SunsetLiveChannelTile(
                 SunsetProgressBar(
                     progress = progress,
                     modifier = Modifier
+                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(2.dp),
                 )
@@ -337,7 +347,7 @@ fun SunsetLiveChannelTile(
 }
 
 /**
- * 64 dp logo framed on a subtle surface so transparent or mismatched artwork reads uniformly.
+ * 56 dp logo framed on a subtle surface so transparent or mismatched artwork reads uniformly.
  */
 @Composable
 private fun FramedChannelLogo(
@@ -347,7 +357,7 @@ private fun FramedChannelLogo(
 ) {
     Box(
         modifier = modifier
-            .size(64.dp)
+            .size(56.dp)
             .background(
                 color = Color.White.copy(alpha = 0.06f),
                 shape = RoundedCornerShape(SunsetRadius.Sm),
@@ -365,7 +375,7 @@ private fun FramedChannelLogo(
         } else {
             Text(
                 text = channelInitials(name),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = SunsetColors.TextSecondary,
             )
         }
