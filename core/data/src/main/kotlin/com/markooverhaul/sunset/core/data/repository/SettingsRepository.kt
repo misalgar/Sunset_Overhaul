@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.markooverhaul.sunset.core.model.VersionPreference
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -19,6 +20,7 @@ data class AppSettings(
     /** BCP-47 tag, or null to follow the system locale. Only `en` and `es` are supported. */
     val languageTag: String? = null,
     val reduceMotion: ReduceMotionSetting = ReduceMotionSetting.SYSTEM,
+    val versionPreference: VersionPreference = VersionPreference.LATINO,
 )
 
 /**
@@ -38,6 +40,9 @@ class SettingsRepository @Inject constructor(
             reduceMotion = prefs[KEY_REDUCE_MOTION]?.let { stored ->
                 ReduceMotionSetting.entries.firstOrNull { it.name == stored }
             } ?: ReduceMotionSetting.SYSTEM,
+            versionPreference = prefs[KEY_VERSION_PREFERENCE]?.let { stored ->
+                VersionPreference.entries.firstOrNull { it.name == stored }
+            } ?: VersionPreference.LATINO,
         )
     }
 
@@ -65,7 +70,12 @@ class SettingsRepository @Inject constructor(
         dataStore.edit { it[KEY_REDUCE_MOTION] = setting.name }
     }
 
+    suspend fun setVersionPreference(preference: VersionPreference) {
+        dataStore.edit { it[KEY_VERSION_PREFERENCE] = preference.name }
+    }
+
     private companion object {
+        val KEY_VERSION_PREFERENCE = stringPreferencesKey("version_preference")
         val KEY_AUTOPLAY = booleanPreferencesKey("autoplay_next")
         val KEY_SUBTITLES = booleanPreferencesKey("subtitles_enabled")
         val KEY_AUDIO_LANGUAGE = stringPreferencesKey("audio_language")

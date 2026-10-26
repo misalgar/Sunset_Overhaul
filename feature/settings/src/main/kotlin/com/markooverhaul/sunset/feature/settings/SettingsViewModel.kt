@@ -12,6 +12,7 @@ import com.markooverhaul.sunset.core.model.AccountSummary
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.ProviderError
 import com.markooverhaul.sunset.core.model.Session
+import com.markooverhaul.sunset.core.model.VersionPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +62,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setReduceMotion(setting: ReduceMotionSetting) {
         viewModelScope.launch { settingsRepository.setReduceMotion(setting) }
+    }
+
+    fun setVersionPreference(preference: VersionPreference) {
+        viewModelScope.launch { settingsRepository.setVersionPreference(preference) }
     }
 
     fun setLanguage(tag: String?) {

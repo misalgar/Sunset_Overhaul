@@ -4,8 +4,9 @@ import com.markooverhaul.sunset.core.database.CatalogueDao
 import com.markooverhaul.sunset.core.database.CatalogueEpisodeEntity
 import com.markooverhaul.sunset.core.database.CatalogueMovieEntity
 import com.markooverhaul.sunset.core.database.CatalogueSeriesEntity
+import com.markooverhaul.sunset.core.database.CatalogueVariantIndex
+import com.markooverhaul.sunset.core.model.normalizeTitleForMatch
 import com.markooverhaul.sunset.core.network.xtream.XtreamCache
-import java.text.Normalizer
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -22,6 +23,7 @@ class TmdbEnricher @Inject constructor(
     private val api: TmdbApi,
     private val dao: CatalogueDao,
     private val cache: XtreamCache,
+    private val variants: CatalogueVariantIndex,
 ) {
     val isConfigured: Boolean get() = api.isConfigured
 
@@ -61,6 +63,7 @@ class TmdbEnricher @Inject constructor(
             tmdbLanguage = cacheLanguage,
         )
         dao.updateMovie(updated)
+        variants.requestRebuild()
         return updated
     }
 
@@ -174,8 +177,8 @@ class TmdbEnricher @Inject constructor(
                 candidate.id !in seen &&
                     yearsCompatible(item.year, candidate.year) &&
                     titles.any { title ->
-                        normalize(candidate.title.replace(QUALITY_SUFFIX, " ")) ==
-                            normalize(title)
+                        normalizeTitleForMatch(candidate.title.replace(QUALITY_SUFFIX, " ")) ==
+                            normalizeTitleForMatch(title)
                     }
             } ?: continue
             seen += match.id
@@ -219,8 +222,8 @@ class TmdbEnricher @Inject constructor(
                 candidate.id !in seen &&
                     yearsCompatible(item.year, candidate.year) &&
                     titles.any { title ->
-                        normalize(candidate.title.replace(QUALITY_SUFFIX, " ")) ==
-                            normalize(title)
+                        normalizeTitleForMatch(candidate.title.replace(QUALITY_SUFFIX, " ")) ==
+                            normalizeTitleForMatch(title)
                     }
             } ?: continue
             seen += match.id
@@ -238,11 +241,11 @@ class TmdbEnricher @Inject constructor(
         title: String,
         year: Int?,
     ): TmdbSearchItem? {
-        val query = normalize(title.replace(QUALITY_SUFFIX, " "))
+        val query = normalizeTitleForMatch(title.replace(QUALITY_SUFFIX, " "))
         if (query.isBlank()) return null
         val scored = results.flatMap { item ->
             listOf(item.displayTitle, item.displayOriginal)
-                .map { normalize(it) }
+                .map { normalizeTitleForMatch(it) }
                 .filter { it.isNotBlank() }
                 .distinct()
                 .map { item to it }
@@ -284,16 +287,6 @@ class TmdbEnricher @Inject constructor(
 
     private val cacheLanguage: String get() = "${api.language}#$MATCHER_VERSION"
 
-    private fun normalize(value: String): String {
-        val tokens = Normalizer.normalize(value, Normalizer.Form.NFD)
-            .replace(Regex("""\p{M}+"""), "")
-            .lowercase(Locale.US)
-            .replace(Regex("""[^a-z0-9]+"""), " ")
-            .split(' ')
-            .filter { it.isNotBlank() && it !in STOP_WORDS }
-        return tokens.joinToString(" ")
-    }
-
     private fun parseDate(raw: String?): Long? {
         val value = raw?.trim().orEmpty()
         if (value.length < 10) return null
@@ -309,10 +302,6 @@ class TmdbEnricher @Inject constructor(
         const val MATCH_TTL_MS = 30L * 24 * 60 * 60 * 1000
         const val RECS_TTL_MS = 24L * 60 * 60 * 1000
         const val MATCHER_VERSION = 2
-        val STOP_WORDS = setOf(
-            "and", "the", "of", "a", "an", "y", "e", "de", "del", "la", "el",
-            "los", "las", "le", "les", "et", "und",
-        )
         val QUALITY_SUFFIX = Regex(
             """\s+(?:SUB|DUB|LAT|LATINO|CAST|ESP|ING|HD|FHD|UHD|4K)$""",
             RegexOption.IGNORE_CASE,

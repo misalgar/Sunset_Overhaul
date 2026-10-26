@@ -1,5 +1,6 @@
 package com.markooverhaul.sunset.core.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -48,6 +49,9 @@ data class CatalogueMetaEntity(
         Index(value = ["categoryId"]),
         Index(value = ["addedAtUtcMs"]),
         Index(value = ["title"]),
+        Index(value = ["titleKey"]),
+        Index(value = ["groupKey"]),
+        Index(value = ["isDefault", "addedAtUtcMs"]),
     ],
 )
 data class CatalogueMovieEntity(
@@ -82,6 +86,12 @@ data class CatalogueMovieEntity(
     val tmdbCertification: String? = null,
     val tmdbMatchedAtUtcMs: Long = 0L,
     val tmdbLanguage: String? = null,
+    /** Normalised title plus year; rows with the same key are versions of one title. */
+    val titleKey: String? = null,
+    /** Shared by every version of a title. Derived by [CatalogueVariantIndex]. */
+    val groupKey: String? = null,
+    /** True for the one version shown as the card; the others appear only on details. */
+    @ColumnInfo(defaultValue = "1") val isDefault: Boolean = true,
 )
 
 @Entity(

@@ -77,6 +77,7 @@ fun DetailsRoute(
         onPlayEpisode = onPlayEpisode,
         onOpenDetails = onOpenDetails,
         onSelectSeason = viewModel::selectSeason,
+        onSelectVariant = viewModel::selectVariant,
         onToggleFavourite = viewModel::toggleFavourite,
         onRetry = viewModel::load,
         modifier = modifier,
@@ -91,6 +92,7 @@ fun DetailsScreen(
     onPlayEpisode: (seriesId: String, seriesTitle: String, episodeId: String, episodeTitle: String) -> Unit,
     onOpenDetails: (ContentType, String) -> Unit,
     onSelectSeason: (Int) -> Unit,
+    onSelectVariant: (String) -> Unit,
     onToggleFavourite: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -170,6 +172,32 @@ fun DetailsScreen(
                                 onPlay = { onPlayMovie(movie) },
                                 onToggleFavourite = onToggleFavourite,
                             )
+                        }
+                        if (movie.variants.size > 1) {
+                            item(key = "versions") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = gutter),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.details_versions),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = SunsetColors.TextTertiary,
+                                    )
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        items(movie.variants, key = { it.id }) { variant ->
+                                            CategoryChip(
+                                                text = variant.label
+                                                    ?: stringResource(R.string.details_version_standard),
+                                                selected = variant.id == movie.id,
+                                                onClick = { onSelectVariant(variant.id) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                         item(key = "facts") {
                             FactsBlock(

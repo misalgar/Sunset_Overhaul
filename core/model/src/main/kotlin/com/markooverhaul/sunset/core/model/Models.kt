@@ -67,6 +67,8 @@ data class Movie(
     val language: String? = null,
     /** Provider quality tag, e.g. `HD`, `4K`. */
     val quality: String? = null,
+    /** Every version of this title, best first. Empty when the title has a single version. */
+    val variants: List<MovieVariant> = emptyList(),
 )
 
 data class SeriesSummary(

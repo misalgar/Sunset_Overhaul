@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         CatalogueSeriesEntity::class,
         CatalogueEpisodeEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class SunsetDatabase : RoomDatabase() {

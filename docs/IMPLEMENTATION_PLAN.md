@@ -604,6 +604,34 @@ Publish: create the `v0.1.2` GitHub release with the APK, then push the updated 
 
 Checks: `testDebugUnitTest` (45 tests), `assembleDebug`, lint 0 errors.
 
+### 5.28 Movie versions: one card, version picker, preferred language (2026-10-26)
+
+Movies that exist in several provider versions (`LAT`, `SUB`, `ESP`, `DUAL`, `4K`) now show one card.
+The details screen lists the versions and Play uses the one selected.
+
+- Grouping (`assignVariantGroups`, pure, unit-tested): rows share a normalised title key
+  (title + year). A bucket with one TMDB id is one group, including rows TMDB has not matched yet.
+  Buckets with conflicting TMDB ids split by id, so remakes never merge.
+- One default per group, chosen by the viewer's preference (`LATINO`: LAT, ESP, SUB, DUAL;
+  `SPANISH`: ESP, LAT, SUB, DUAL; `SUBTITLED`: SUB, LAT, ESP, DUAL), then quality (4K > FHD > HD),
+  then newest. Grids, search and genre rails read only `isDefault = 1` rows.
+- DB v4 (`Migration3To4`): adds `titleKey`, `groupKey`, `isDefault` and indices, and fills `titleKey`
+  in place. No resync. `CatalogueVariantIndex` assigns groups and defaults in the background
+  (debounced); it writes only rows that changed and bumps a revision only when a visible default
+  flips, so open grids don't reload on every TMDB match.
+- Resyncs keep TMDB enrichment (`withTmdbState`), so the six-hourly refresh no longer re-matches
+  the catalogue.
+- Details: a Versions row appears for multi-version titles. Selecting a version reloads that
+  provider row; Play, progress and favourites follow the selected id.
+- Settings → Playback → Preferred version (persisted in DataStore). Changing it re-derives defaults
+  and the open Movies grid reloads when it is next shown.
+- Series still show one card per provider row, with badges. Grouping series is the next step.
+
+Known limits: favourites and watch progress are stored per provider id, so they stay with the
+version used. Home rails refresh on the same revision signal and may briefly reload.
+Verified on Fire TV: v3→v4 upgrade in place, duplicate cards collapse, versions row switches the
+hero's language, the preference changes the default after a relaunch.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

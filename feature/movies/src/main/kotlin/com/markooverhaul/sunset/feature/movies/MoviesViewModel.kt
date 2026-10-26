@@ -8,6 +8,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.markooverhaul.sunset.core.common.IoDispatcher
 import com.markooverhaul.sunset.core.data.paging.MoviePagingSource
+import com.markooverhaul.sunset.core.data.repository.CatalogueChanges
 import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.Movie
@@ -17,6 +18,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -33,6 +35,7 @@ data class MoviesUiState(
 @HiltViewModel
 class MoviesViewModel @Inject constructor(
     private val provider: ContentProvider,
+    catalogueChanges: CatalogueChanges,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -41,8 +44,12 @@ class MoviesViewModel @Inject constructor(
 
     private val categoryFilter = MutableStateFlow<String?>(null)
 
+    /** A new pager after every grouping change, so a preference change shows at once. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val movies: Flow<PagingData<Movie>> = categoryFilter
+    val movies: Flow<PagingData<Movie>> = combine(
+        categoryFilter,
+        catalogueChanges.revisions,
+    ) { categoryId, _ -> categoryId }
         .flatMapLatest { categoryId ->
             Pager(
                 config = PagingConfig(

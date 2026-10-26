@@ -18,10 +18,10 @@ interface CatalogueDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMeta(entity: CatalogueMetaEntity)
 
-    @Query("SELECT COUNT(*) FROM catalogue_movies")
+    @Query("SELECT COUNT(*) FROM catalogue_movies WHERE isDefault = 1")
     suspend fun movieCount(): Int
 
-    @Query("SELECT COUNT(*) FROM catalogue_movies WHERE categoryId = :categoryId")
+    @Query("SELECT COUNT(*) FROM catalogue_movies WHERE isDefault = 1 AND categoryId = :categoryId")
     suspend fun movieCount(categoryId: String): Int
 
     @Query("SELECT COUNT(*) FROM catalogue_series")
@@ -31,38 +31,38 @@ interface CatalogueDao {
     suspend fun seriesCount(categoryId: String): Int
 
     @Query(
-        "SELECT * FROM catalogue_movies ORDER BY addedAtUtcMs DESC, title " +
-            "LIMIT :limit OFFSET :offset",
+        "SELECT * FROM catalogue_movies WHERE isDefault = 1 " +
+            "ORDER BY addedAtUtcMs DESC, title LIMIT :limit OFFSET :offset",
     )
     suspend fun moviesPage(limit: Int, offset: Int): List<CatalogueMovieEntity>
 
     @Query(
-        "SELECT * FROM catalogue_movies WHERE categoryId = :categoryId " +
+        "SELECT * FROM catalogue_movies WHERE isDefault = 1 AND categoryId = :categoryId " +
             "ORDER BY addedAtUtcMs DESC, title LIMIT :limit OFFSET :offset",
     )
     suspend fun moviesPage(categoryId: String, limit: Int, offset: Int): List<CatalogueMovieEntity>
 
     @Query(
-        "SELECT * FROM catalogue_movies WHERE title LIKE '%' || :term || '%' " +
+        "SELECT * FROM catalogue_movies WHERE isDefault = 1 AND title LIKE '%' || :term || '%' " +
             "ORDER BY title LIMIT :limit",
     )
     suspend fun searchMoviesByTitle(term: String, limit: Int): List<CatalogueMovieEntity>
 
     @Query(
-        "SELECT * FROM catalogue_series WHERE title LIKE '%' || :term || '%' " +
-            "ORDER BY title LIMIT :limit",
-    )
-    suspend fun searchSeriesByTitle(term: String, limit: Int): List<CatalogueSeriesEntity>
-
-    @Query(
-        "SELECT * FROM catalogue_movies WHERE id != :excludeId AND genres LIKE '%' || :genre || '%' " +
-            "ORDER BY addedAtUtcMs DESC, title LIMIT :limit",
+        "SELECT * FROM catalogue_movies WHERE isDefault = 1 AND id != :excludeId " +
+            "AND genres LIKE '%' || :genre || '%' ORDER BY addedAtUtcMs DESC, title LIMIT :limit",
     )
     suspend fun moviesByGenre(
         genre: String,
         excludeId: String,
         limit: Int,
     ): List<CatalogueMovieEntity>
+
+    @Query(
+        "SELECT * FROM catalogue_series WHERE title LIKE '%' || :term || '%' " +
+            "ORDER BY title LIMIT :limit",
+    )
+    suspend fun searchSeriesByTitle(term: String, limit: Int): List<CatalogueSeriesEntity>
 
     @Query(
         "SELECT * FROM catalogue_series WHERE id != :excludeId AND genres LIKE '%' || :genre || '%' " +
@@ -78,7 +78,7 @@ interface CatalogueDao {
     suspend fun movie(id: String): CatalogueMovieEntity?
 
     @Query(
-        "SELECT * FROM catalogue_movies WHERE title LIKE '%' || :term || '%' " +
+        "SELECT * FROM catalogue_movies WHERE isDefault = 1 AND title LIKE '%' || :term || '%' " +
             "ORDER BY addedAtUtcMs DESC, title LIMIT :limit",
     )
     suspend fun searchMovies(term: String, limit: Int): List<CatalogueMovieEntity>
@@ -97,6 +97,30 @@ interface CatalogueDao {
 
     @Query("DELETE FROM catalogue_movies")
     suspend fun clearMovies()
+
+    @Query("SELECT * FROM catalogue_movies WHERE groupKey = :groupKey")
+    suspend fun movieVariants(groupKey: String): List<CatalogueMovieEntity>
+
+    @Query(
+        "SELECT id, titleKey, tmdbId, language, quality, addedAtUtcMs, groupKey, isDefault " +
+            "FROM catalogue_movies",
+    )
+    suspend fun movieVariantRows(): List<MovieVariantRow>
+
+    @Query(
+        "SELECT id, tmdbId, tmdbPosterUrl, tmdbBackdropUrl, tmdbOverview, tmdbRating, tmdbGenres, " +
+            "tmdbCast, tmdbRuntime, tmdbCertification, tmdbMatchedAtUtcMs, tmdbLanguage " +
+            "FROM catalogue_movies WHERE tmdbId IS NOT NULL OR tmdbMatchedAtUtcMs > 0",
+    )
+    suspend fun movieTmdbStates(): List<MovieTmdbState>
+
+    @Query("UPDATE catalogue_movies SET groupKey = :groupKey, isDefault = :isDefault WHERE id = :id")
+    suspend fun setMovieVariant(id: String, groupKey: String, isDefault: Boolean)
+
+    @Transaction
+    suspend fun applyMovieVariants(updates: List<MovieVariantUpdate>) {
+        updates.forEach { setMovieVariant(it.id, it.groupKey, it.isDefault) }
+    }
 
     @Query(
         "SELECT * FROM catalogue_series ORDER BY addedAtUtcMs DESC, title " +
@@ -200,3 +224,37 @@ interface CatalogueDao {
         clearMeta()
     }
 }
+
+/** The columns [CatalogueVariantIndex] needs to group movies, without loading their artwork. */
+data class MovieVariantRow(
+    val id: String,
+    val titleKey: String?,
+    val tmdbId: String?,
+    val language: String?,
+    val quality: String?,
+    val addedAtUtcMs: Long,
+    val groupKey: String?,
+    val isDefault: Boolean,
+)
+
+data class MovieVariantUpdate(
+    val id: String,
+    val groupKey: String,
+    val isDefault: Boolean,
+)
+
+/** TMDB enrichment for a movie, carried across a catalogue resync so it isn't matched again. */
+data class MovieTmdbState(
+    val id: String,
+    val tmdbId: String?,
+    val tmdbPosterUrl: String?,
+    val tmdbBackdropUrl: String?,
+    val tmdbOverview: String?,
+    val tmdbRating: Double?,
+    val tmdbGenres: String,
+    val tmdbCast: String,
+    val tmdbRuntime: Int?,
+    val tmdbCertification: String?,
+    val tmdbMatchedAtUtcMs: Long,
+    val tmdbLanguage: String?,
+)

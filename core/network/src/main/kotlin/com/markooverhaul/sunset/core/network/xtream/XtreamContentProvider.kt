@@ -6,9 +6,12 @@ import com.markooverhaul.sunset.core.database.CatalogueEpisodeEntity
 import com.markooverhaul.sunset.core.database.CatalogueMetaEntity
 import com.markooverhaul.sunset.core.database.CatalogueMovieEntity
 import com.markooverhaul.sunset.core.database.CatalogueSeriesEntity
+import com.markooverhaul.sunset.core.database.CatalogueVariantIndex
+import com.markooverhaul.sunset.core.database.VersionPreferenceSource
 import com.markooverhaul.sunset.core.database.toDetail
 import com.markooverhaul.sunset.core.database.toDomain
 import com.markooverhaul.sunset.core.database.toSummary
+import com.markooverhaul.sunset.core.database.withTmdbState
 import com.markooverhaul.sunset.core.model.AccountSummary
 import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.model.CategoryType
@@ -35,7 +38,11 @@ import com.markooverhaul.sunset.core.model.isInternalLiveCategory
 import com.markooverhaul.sunset.core.model.cleanCategoryDisplayName
 import com.markooverhaul.sunset.core.model.liveCategoryGroup
 import com.markooverhaul.sunset.core.model.parseLiveEventSchedule
+import com.markooverhaul.sunset.core.model.MovieVariant
+import com.markooverhaul.sunset.core.model.VariantCandidate
+import com.markooverhaul.sunset.core.model.movieTitleKey
 import com.markooverhaul.sunset.core.model.parseProviderVariant
+import com.markooverhaul.sunset.core.model.variantOrder
 import com.markooverhaul.sunset.core.model.sanitizeProviderName
 import com.markooverhaul.sunset.core.network.tmdb.TmdbEnricher
 import java.text.SimpleDateFormat
@@ -44,6 +51,7 @@ import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -66,6 +74,8 @@ class XtreamContentProvider @Inject constructor(
     private val cache: XtreamCache,
     private val catalogueDao: CatalogueDao,
     private val tmdb: TmdbEnricher,
+    private val variantIndex: CatalogueVariantIndex,
+    private val preferences: VersionPreferenceSource,
 ) : ContentProvider {
 
     private val mutex = Mutex()
@@ -243,7 +253,18 @@ class XtreamContentProvider @Inject constructor(
         ensureCatalogue()
         var entity = catalogueDao.movie(id) ?: return null
         entity = enrichMovie(entity)
-        return entity.toDomain()
+        return entity.toDomain().copy(variants = movieVariants(entity))
+    }
+
+    private suspend fun movieVariants(entity: CatalogueMovieEntity): List<MovieVariant> {
+        val groupKey = entity.groupKey ?: return emptyList()
+        val group = catalogueDao.movieVariants(groupKey)
+        if (group.size < 2) return emptyList()
+        val order = preferences.preference.first().variantOrder()
+        return group
+            .map { VariantCandidate(it.id, "", null, it.language, it.quality, it.addedAtUtcMs) }
+            .sortedWith(order)
+            .map { MovieVariant(it.id, it.language, it.quality) }
     }
 
     override suspend fun getMovieSummary(id: String): Movie? {
@@ -659,7 +680,11 @@ class XtreamContentProvider @Inject constructor(
         // retried without pulling another 16 MB.
         val moviesBody = cached("vod_streams", "get_vod_streams")
         val seriesBody = cached("series", "get_series")
+        // Keep TMDB matches across the resync; otherwise every six-hour refresh would re-match the
+        // whole catalogue and variant groups would briefly fall apart.
+        val tmdbState = catalogueDao.movieTmdbStates().associateBy { it.id }
         val movies = withContext(Dispatchers.IO) { parseMovieEntities(moviesBody) }
+            .map { it.withTmdbState(tmdbState[it.id]) }
         val series = withContext(Dispatchers.IO) { parseSeriesEntities(seriesBody) }
         catalogueDao.replaceCatalogue(
             meta = CatalogueMetaEntity(
@@ -671,6 +696,7 @@ class XtreamContentProvider @Inject constructor(
             movies = movies,
             series = series,
         )
+        variantIndex.rebuild()
         providerScope.launch {
             runCatching { backfillArtwork() }
         }
@@ -703,6 +729,7 @@ class XtreamContentProvider @Inject constructor(
                     language = variant.language,
                     quality = variant.quality,
                     title = title,
+                    titleKey = movieTitleKey(title, year),
                     year = year,
                     posterUrl = dto.streamIcon.takeIf { it.isNotBlank() },
                     rating = dto.rating.toDoubleOrNull(),
@@ -759,6 +786,7 @@ class XtreamContentProvider @Inject constructor(
             detailSyncedAtUtcMs = System.currentTimeMillis(),
         )
         catalogueDao.updateMovie(enriched)
+        variantIndex.requestRebuild()
         return tmdb.enrichMovie(enriched)
     }
 

@@ -197,6 +197,8 @@
     <!-- Details -->
     <string name="details_synopsis">Synopsis</string>
     <string name="details_cast">Cast</string>
+    <string name="details_versions">Versions</string>
+    <string name="details_version_standard">Standard</string>
     <string name="details_director">Director</string>
     <string name="details_more_like_this">More like this</string>
     <string name="details_similar_loading">Finding similar titles…</string>
@@ -370,6 +372,11 @@
     <string name="settings_player_engine_hint">Media3 is the only engine in this build. VLC fallback is not included.</string>
     <string name="settings_autoplay_hint">Only applies when a next episode exists.</string>
     <string name="settings_reduce_motion_hint">Reduces focus scaling and transitions.</string>
+    <string name="settings_version_preference">Preferred version</string>
+    <string name="settings_version_preference_hint">Chooses the default card and the version played when a title has several.</string>
+    <string name="settings_version_latino">Latino first</string>
+    <string name="settings_version_spanish">Spanish first</string>
+    <string name="settings_version_subtitled">Subtitled original</string>
     <string name="settings_about_body">Sunset foundation milestone. Offline demo data, no provider calls.</string>
     <string name="settings_device">Device</string>
     <string name="settings_player_section">Player</string>

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markooverhaul.sunset.core.data.repository.ReduceMotionSetting
+import com.markooverhaul.sunset.core.model.VersionPreference
 import com.markooverhaul.sunset.core.designsystem.components.CategoryChip
 import com.markooverhaul.sunset.core.designsystem.components.SunsetFocusable
 import com.markooverhaul.sunset.core.designsystem.components.SunsetSectionHeader
@@ -81,6 +82,7 @@ fun SettingsRoute(
         onAutoplayChange = viewModel::setAutoplayNext,
         onSubtitlesChange = viewModel::setSubtitlesEnabled,
         onReduceMotionChange = viewModel::setReduceMotion,
+        onVersionPreferenceChange = viewModel::setVersionPreference,
         onLanguageChange = viewModel::setLanguage,
         onSignOut = viewModel::signOut,
         onOpenParental = onOpenParental,
@@ -101,6 +103,7 @@ fun SettingsScreen(
     onAutoplayChange: (Boolean) -> Unit,
     onSubtitlesChange: (Boolean) -> Unit,
     onReduceMotionChange: (ReduceMotionSetting) -> Unit,
+    onVersionPreferenceChange: (VersionPreference) -> Unit,
     onLanguageChange: (String?) -> Unit,
     onSignOut: () -> Unit,
     onOpenParental: () -> Unit,
@@ -198,6 +201,26 @@ fun SettingsScreen(
                             checked = settings.subtitlesEnabled,
                             onCheckedChange = onSubtitlesChange,
                         )
+                        SettingsChipGroup(
+                            title = stringResource(R.string.settings_version_preference),
+                            hint = stringResource(R.string.settings_version_preference_hint),
+                        ) {
+                            CategoryChip(
+                                text = stringResource(R.string.settings_version_latino),
+                                selected = settings.versionPreference == VersionPreference.LATINO,
+                                onClick = { onVersionPreferenceChange(VersionPreference.LATINO) },
+                            )
+                            CategoryChip(
+                                text = stringResource(R.string.settings_version_spanish),
+                                selected = settings.versionPreference == VersionPreference.SPANISH,
+                                onClick = { onVersionPreferenceChange(VersionPreference.SPANISH) },
+                            )
+                            CategoryChip(
+                                text = stringResource(R.string.settings_version_subtitled),
+                                selected = settings.versionPreference == VersionPreference.SUBTITLED,
+                                onClick = { onVersionPreferenceChange(VersionPreference.SUBTITLED) },
+                            )
+                        }
                         SettingsInfoRow(
                             title = stringResource(R.string.settings_player_engine),
                             value = stringResource(R.string.settings_player_engine_media3),

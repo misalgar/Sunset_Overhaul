@@ -3,6 +3,7 @@ package com.markooverhaul.sunset.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markooverhaul.sunset.core.common.IoDispatcher
+import com.markooverhaul.sunset.core.data.repository.CatalogueChanges
 import com.markooverhaul.sunset.core.data.repository.FavouritesRepository
 import com.markooverhaul.sunset.core.data.repository.ProgressRepository
 import com.markooverhaul.sunset.core.model.ContentProvider
@@ -21,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -68,6 +70,7 @@ class HomeViewModel @Inject constructor(
     private val provider: ContentProvider,
     private val progressRepository: ProgressRepository,
     favouritesRepository: FavouritesRepository,
+    catalogueChanges: CatalogueChanges,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -109,6 +112,9 @@ class HomeViewModel @Inject constructor(
             favouritesRepository.contentIds.collect { ids ->
                 _state.update { it.copy(favouriteIds = ids) }
             }
+        }
+        viewModelScope.launch {
+            catalogueChanges.revisions.drop(1).collect { refresh() }
         }
         refresh()
     }

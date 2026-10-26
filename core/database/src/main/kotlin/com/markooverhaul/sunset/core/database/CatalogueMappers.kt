@@ -23,6 +23,26 @@ private val QUALITY_SUFFIX = Regex(
 private fun String.cleanDisplayTitle(): String =
     replace(QUALITY_SUFFIX, "").trim().ifBlank { this }
 
+/** Restores TMDB enrichment onto a freshly parsed row so a resync keeps the existing matches. */
+fun CatalogueMovieEntity.withTmdbState(state: MovieTmdbState?): CatalogueMovieEntity =
+    if (state == null) {
+        this
+    } else {
+        copy(
+            tmdbId = state.tmdbId,
+            tmdbPosterUrl = state.tmdbPosterUrl,
+            tmdbBackdropUrl = state.tmdbBackdropUrl,
+            tmdbOverview = state.tmdbOverview,
+            tmdbRating = state.tmdbRating,
+            tmdbGenres = state.tmdbGenres,
+            tmdbCast = state.tmdbCast,
+            tmdbRuntime = state.tmdbRuntime,
+            tmdbCertification = state.tmdbCertification,
+            tmdbMatchedAtUtcMs = state.tmdbMatchedAtUtcMs,
+            tmdbLanguage = state.tmdbLanguage,
+        )
+    }
+
 /**
  * Domain mapping policy: provider identity and playback fields always win. TMDB supplies the
  * editorial fields (overview, cast, genres, runtime, certification) and fills missing artwork,

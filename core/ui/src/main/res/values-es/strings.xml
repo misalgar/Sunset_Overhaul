@@ -185,6 +185,8 @@
 
     <string name="details_synopsis">Sinopsis</string>
     <string name="details_cast">Reparto</string>
+    <string name="details_versions">Versiones</string>
+    <string name="details_version_standard">Estándar</string>
     <string name="details_director">Dirección</string>
     <string name="details_more_like_this">Títulos similares</string>
     <string name="details_similar_loading">Buscando títulos similares…</string>
@@ -349,6 +351,11 @@
     <string name="settings_player_engine_hint">Media3 es el único motor de esta compilación. No se incluye el respaldo VLC.</string>
     <string name="settings_autoplay_hint">Solo se aplica cuando existe un episodio siguiente.</string>
     <string name="settings_reduce_motion_hint">Reduce el escalado de foco y las transiciones.</string>
+    <string name="settings_version_preference">Versión preferida</string>
+    <string name="settings_version_preference_hint">Elige la tarjeta principal y la versión que se reproduce cuando un título tiene varias.</string>
+    <string name="settings_version_latino">Latino primero</string>
+    <string name="settings_version_spanish">Español primero</string>
+    <string name="settings_version_subtitled">Original subtitulado</string>
     <string name="settings_about_body">Hito de base de Sunset. Datos de demostración sin conexión, sin llamadas al proveedor.</string>
     <string name="settings_device">Dispositivo</string>
     <string name="settings_player_section">Reproductor</string>

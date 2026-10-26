@@ -18,6 +18,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -66,21 +68,39 @@ class DetailsViewModel @Inject constructor(
         ?: ContentType.MOVIE
     private val contentId: String = savedStateHandle.get<String>(ARG_ID).orEmpty()
 
+    /** The id being shown. Movies can switch between versions; progress and favourites follow it. */
+    private val activeId = MutableStateFlow(contentId)
+
     private val _state = MutableStateFlow(DetailsUiState())
     val state = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
-            progressRepository.observe(contentId).collect { progress ->
+            activeId.flatMapLatest { progressRepository.observe(it) }.collect { progress ->
                 _state.update { it.copy(progress = progress) }
             }
         }
         viewModelScope.launch {
-            favouritesRepository.contentIds.collect { ids ->
-                _state.update { it.copy(isFavourite = contentId in ids) }
-            }
+            combine(activeId, favouritesRepository.contentIds) { id, ids -> id in ids }
+                .collect { isFavourite ->
+                    _state.update { it.copy(isFavourite = isFavourite) }
+                }
         }
         load()
+    }
+
+    /** Shows another version of the same movie; Play, progress and favourites use that version. */
+    fun selectVariant(id: String) {
+        if (id == activeId.value) return
+        activeId.value = id
+        viewModelScope.launch {
+            val movie = withContext(ioDispatcher) {
+                runCatching { provider.getMovie(id) }.getOrNull()
+            } ?: return@launch
+            if (activeId.value == id) {
+                _state.update { it.copy(movie = movie) }
+            }
+        }
     }
 
     fun selectSeason(number: Int) {
@@ -89,7 +109,7 @@ class DetailsViewModel @Inject constructor(
 
     fun toggleFavourite() {
         viewModelScope.launch {
-            favouritesRepository.toggle(contentId, contentType)
+            favouritesRepository.toggle(activeId.value, contentType)
         }
     }
 
@@ -117,7 +137,7 @@ class DetailsViewModel @Inject constructor(
     private suspend fun loadMovie() {
         // Fast path: paint the title/artwork from Room while provider detail and TMDB load.
         val summary = withContext(ioDispatcher) {
-            runCatching { provider.getMovieSummary(contentId) }.getOrNull()
+            runCatching { provider.getMovieSummary(activeId.value) }.getOrNull()
         }
         if (summary != null) {
             _state.update {
@@ -131,7 +151,7 @@ class DetailsViewModel @Inject constructor(
             }
         }
 
-        val movie = withContext(ioDispatcher) { provider.getMovie(contentId) }
+        val movie = withContext(ioDispatcher) { provider.getMovie(activeId.value) }
         if (movie == null) {
             _state.update {
                 it.copy(
