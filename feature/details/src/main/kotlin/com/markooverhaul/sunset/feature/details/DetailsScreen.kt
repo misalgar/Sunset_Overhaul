@@ -346,7 +346,6 @@ fun DetailsScreen(
                                             onClick = { onOpenDetails(ContentType.MOVIE, item.movie.id) },
                                             year = item.movie.year,
                                             subtitle = item.movie.genres.firstOrNull(),
-                                            badge = item.movie.variantLabel,
                                             width = if (isTv) 184.dp else 148.dp,
                                             modifier = modifier,
                                         )
@@ -441,7 +440,8 @@ private fun MovieHero(
     val meta = buildList {
         movie.year?.let { add(it.toString()) }
         movie.certification?.let { add(it) }
-        movie.variantLabel?.let { add(it) }
+        // Only informative when there is more than one version to choose from.
+        if (movie.variants.size > 1) movie.variantLabel?.let { add(it) }
         SunsetFormat.runtime(context, movie.durationMinutes)?.let { add(it) }
         movie.rating?.let { add(context.getString(R.string.rating_value, String.format(Locale.getDefault(), "%.1f", it))) }
         movie.genres.firstOrNull()?.let { add(it) }

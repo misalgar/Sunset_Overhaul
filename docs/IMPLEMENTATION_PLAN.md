@@ -632,6 +632,10 @@ version used. Home rails refresh on the same revision signal and may briefly rel
 Verified on Fire TV: v3→v4 upgrade in place, duplicate cards collapse, versions row switches the
 hero's language, the preference changes the default after a relaunch.
 
+Follow-up: movie cards no longer show the language/quality badge (the version is chosen on
+details). The details hero shows it only when a title has more than one version. Series keep their
+badge until they are grouped the same way.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

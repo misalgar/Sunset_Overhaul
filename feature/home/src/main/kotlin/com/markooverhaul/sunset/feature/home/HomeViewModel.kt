@@ -209,7 +209,6 @@ class HomeViewModel @Inject constructor(
                                     posterUrl = movie.posterUrl,
                                     year = movie.year,
                                     subtitle = movie.genres.firstOrNull(),
-                                    variant = movie.variantLabel,
                                 )
                             }
 

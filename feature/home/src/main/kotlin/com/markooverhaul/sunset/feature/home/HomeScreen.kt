@@ -622,7 +622,6 @@ private fun MoviePoster(
         onClick = { onOpenDetails(ContentType.MOVIE, movie.id) },
         year = movie.year,
         subtitle = movie.genres.firstOrNull() ?: movie.year?.toString(),
-        badge = movie.variantLabel,
         width = width,
         modifier = modifier,
     )
@@ -739,7 +738,7 @@ private fun savedCards(state: HomeUiState): List<SavedCard> = buildList {
                     it.posterUrl,
                     it.year,
                     it.genres.firstOrNull(),
-                    it.variantLabel,
+                    null,
                 ),
             )
         }

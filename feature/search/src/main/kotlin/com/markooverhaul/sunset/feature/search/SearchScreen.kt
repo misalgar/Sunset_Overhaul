@@ -575,7 +575,6 @@ fun SearchScreen(
                                         onClick = { onOpenDetails(ContentType.MOVIE, movie.id) },
                                         year = movie.year,
                                         subtitle = movie.genres.firstOrNull(),
-                                        badge = movie.variantLabel,
                                         modifier = itemModifier.then(
                                             if (
                                                 focusGroup == SearchFocusGroup.Movies &&
