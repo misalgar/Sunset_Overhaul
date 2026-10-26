@@ -55,6 +55,7 @@ import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.model.LiveChannel
+import com.markooverhaul.sunset.core.model.variantLabel
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelRow
 import com.markooverhaul.sunset.core.ui.components.SunsetContentRow
@@ -574,6 +575,7 @@ fun SearchScreen(
                                         onClick = { onOpenDetails(ContentType.MOVIE, movie.id) },
                                         year = movie.year,
                                         subtitle = movie.genres.firstOrNull(),
+                                        badge = movie.variantLabel,
                                         modifier = itemModifier.then(
                                             if (
                                                 focusGroup == SearchFocusGroup.Movies &&
@@ -604,6 +606,7 @@ fun SearchScreen(
                                         onClick = { onOpenDetails(ContentType.SERIES, series.id) },
                                         year = series.year,
                                         subtitle = series.genres.firstOrNull(),
+                                        badge = series.variantLabel,
                                         modifier = itemModifier.then(
                                             if (
                                                 focusGroup == SearchFocusGroup.Series &&

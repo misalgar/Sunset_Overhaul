@@ -53,6 +53,8 @@ data class CatalogueMetaEntity(
 data class CatalogueMovieEntity(
     @PrimaryKey val id: String,
     val categoryId: String = "",
+    val language: String? = null,
+    val quality: String? = null,
     val title: String,
     val year: Int? = null,
     val plot: String? = null,
@@ -93,6 +95,8 @@ data class CatalogueMovieEntity(
 data class CatalogueSeriesEntity(
     @PrimaryKey val id: String,
     val categoryId: String = "",
+    val language: String? = null,
+    val quality: String? = null,
     val title: String,
     val year: Int? = null,
     val posterUrl: String? = null,

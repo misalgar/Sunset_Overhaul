@@ -30,6 +30,7 @@ import com.markooverhaul.sunset.core.designsystem.components.SunsetSkeleton
 import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.model.ContentType
+import com.markooverhaul.sunset.core.model.variantLabel
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.SunsetFilterRow
@@ -146,6 +147,7 @@ fun MoviesScreen(
                 onClick = { onOpenDetails(ContentType.MOVIE, movie.id) },
                 year = movie.year,
                 subtitle = movie.genres.firstOrNull(),
+                badge = movie.variantLabel,
                 width = posterWidth,
             )
         }

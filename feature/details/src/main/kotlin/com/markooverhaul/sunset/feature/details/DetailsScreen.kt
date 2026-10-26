@@ -48,6 +48,7 @@ import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.model.Episode
 import com.markooverhaul.sunset.core.model.Movie
 import com.markooverhaul.sunset.core.model.SeriesDetail
+import com.markooverhaul.sunset.core.model.variantLabel
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetArtwork
 import com.markooverhaul.sunset.core.ui.components.SunsetBackHeader
@@ -317,6 +318,7 @@ fun DetailsScreen(
                                             onClick = { onOpenDetails(ContentType.MOVIE, item.movie.id) },
                                             year = item.movie.year,
                                             subtitle = item.movie.genres.firstOrNull(),
+                                            badge = item.movie.variantLabel,
                                             width = if (isTv) 184.dp else 148.dp,
                                             modifier = modifier,
                                         )
@@ -327,6 +329,7 @@ fun DetailsScreen(
                                             onClick = { onOpenDetails(ContentType.SERIES, item.series.id) },
                                             year = item.series.year,
                                             subtitle = item.series.genres.firstOrNull(),
+                                            badge = item.series.variantLabel,
                                             width = if (isTv) 184.dp else 148.dp,
                                             modifier = modifier,
                                         )
@@ -410,6 +413,7 @@ private fun MovieHero(
     val meta = buildList {
         movie.year?.let { add(it.toString()) }
         movie.certification?.let { add(it) }
+        movie.variantLabel?.let { add(it) }
         SunsetFormat.runtime(context, movie.durationMinutes)?.let { add(it) }
         movie.rating?.let { add(context.getString(R.string.rating_value, String.format(Locale.getDefault(), "%.1f", it))) }
         movie.genres.firstOrNull()?.let { add(it) }
@@ -445,6 +449,7 @@ private fun SeriesHero(
     val meta = buildList {
         summary.year?.let { add(it.toString()) }
         detail.certification?.let { add(it) }
+        summary.variantLabel?.let { add(it) }
         add(qualifier)
         summary.rating?.let { add(context.getString(R.string.rating_value, String.format(Locale.getDefault(), "%.1f", it))) }
         summary.genres.firstOrNull()?.let { add(it) }

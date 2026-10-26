@@ -12,6 +12,7 @@ import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.model.Movie
 import com.markooverhaul.sunset.core.model.SeriesSummary
 import com.markooverhaul.sunset.core.model.WatchProgress
+import com.markooverhaul.sunset.core.model.variantLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -37,6 +38,7 @@ data class HomeRailItem(
     val posterUrl: String?,
     val year: Int?,
     val subtitle: String?,
+    val variant: String? = null,
 )
 
 data class HomeUiState(
@@ -201,6 +203,7 @@ class HomeViewModel @Inject constructor(
                                     posterUrl = movie.posterUrl,
                                     year = movie.year,
                                     subtitle = movie.genres.firstOrNull(),
+                                    variant = movie.variantLabel,
                                 )
                             }
 
@@ -214,6 +217,7 @@ class HomeViewModel @Inject constructor(
                                         posterUrl = series.posterUrl,
                                         year = series.year,
                                         subtitle = series.genres.firstOrNull(),
+                                        variant = series.variantLabel,
                                     )
                                 }
 

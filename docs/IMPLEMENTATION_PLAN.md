@@ -559,6 +559,28 @@ Checks: `assembleDebug`, `testDebugUnitTest` (41 tests), lint 0 errors.
 
 Next: publish 0.1.2, catch-up playback, phone/tablet pass.
 
+### 5.26 Provider language/quality labels (2026-10-26)
+
+The Xtream list endpoints have no language/quality field; the panel encodes them as trailing tokens
+in `name` (`Mayday (2026) LAT`, `The Runner (2026) SUB`, `… DUAL`, `… 4K`). Duplicate cards were
+distinct stream ids in the same category with the same poster; the movie cleaner removed the only
+differentiator.
+
+- `parseProviderVariant` extracts trailing language (`LAT`, `LATINO`, `SUB`, `DUB`, `DUAL`, `ESP`,
+  `ING`, `CAST`, `VOSE`) and quality (`HD`, `FHD`, `UHD`, `4K`, `SD`, `1080P`, `720P`) tags,
+  supports bracketed/combined tags, and returns the clean title.
+- `Movie` and `SeriesSummary` now carry `language`/`quality`; the catalogue schema adds the same
+  columns (DB v3, non-destructive migration, catalogue meta reset to force a one-time re-sync).
+- Card badges show the variant (`LAT`, `SUB`, `ESP`, `4K`, `LAT · 4K`) on Movies, Series, Home
+  rails, Search, My List and the details hero, so duplicates are distinguishable. Series titles are
+  cleaned as well.
+- Unit tests cover the parser and label formatting.
+
+Fire TV verified after the automatic catalogue re-sync: The Senior Class (`LAT`/`SUB`), The American
+Dream (`ESP`/`SUB`) and the other variants now carry clear badges.
+
+Next: group variants under one card with a details version picker.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

@@ -45,6 +45,7 @@ import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.model.Movie
 import com.markooverhaul.sunset.core.model.SeriesSummary
 import com.markooverhaul.sunset.core.model.WatchProgress
+import com.markooverhaul.sunset.core.model.variantLabel
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelCard
 import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
@@ -432,6 +433,7 @@ fun HomeScreen(
                                 onClick = { onOpenDetails(item.type, item.id) },
                                 year = item.year,
                                 subtitle = item.subtitle,
+                                badge = item.variant,
                                 width = posterWidth,
                                 modifier = itemFocusModifier(
                                     "because",
@@ -554,6 +556,7 @@ fun HomeScreen(
                                 onClick = { onOpenDetails(card.type, card.id) },
                                 year = card.year,
                                 subtitle = card.subtitle,
+                                badge = card.variant,
                                 width = posterWidth,
                                 modifier = itemFocusModifier(
                                     "saved",
@@ -619,6 +622,7 @@ private fun MoviePoster(
         onClick = { onOpenDetails(ContentType.MOVIE, movie.id) },
         year = movie.year,
         subtitle = movie.genres.firstOrNull() ?: movie.year?.toString(),
+        badge = movie.variantLabel,
         width = width,
         modifier = modifier,
     )
@@ -642,6 +646,7 @@ private fun SeriesPoster(
         onClick = { onOpenDetails(ContentType.SERIES, series.id) },
         year = series.year,
         subtitle = subtitle,
+        badge = series.variantLabel,
         width = width,
         modifier = modifier,
     )
@@ -719,14 +724,39 @@ private data class SavedCard(
     val posterUrl: String?,
     val year: Int?,
     val subtitle: String?,
+    val variant: String?,
 )
 
 private fun savedCards(state: HomeUiState): List<SavedCard> = buildList {
     state.recentMovies
         .filter { it.id in state.favouriteIds }
-        .forEach { add(SavedCard(it.id, ContentType.MOVIE, it.title, it.posterUrl, it.year, it.genres.firstOrNull())) }
+        .forEach {
+            add(
+                SavedCard(
+                    it.id,
+                    ContentType.MOVIE,
+                    it.title,
+                    it.posterUrl,
+                    it.year,
+                    it.genres.firstOrNull(),
+                    it.variantLabel,
+                ),
+            )
+        }
     state.recentSeries
         .filter { it.id in state.favouriteIds }
-        .forEach { add(SavedCard(it.id, ContentType.SERIES, it.title, it.posterUrl, it.year, it.genres.firstOrNull())) }
+        .forEach {
+            add(
+                SavedCard(
+                    it.id,
+                    ContentType.SERIES,
+                    it.title,
+                    it.posterUrl,
+                    it.year,
+                    it.genres.firstOrNull(),
+                    it.variantLabel,
+                ),
+            )
+        }
 }
 

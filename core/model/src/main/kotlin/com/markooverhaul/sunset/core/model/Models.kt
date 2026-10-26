@@ -63,6 +63,10 @@ data class Movie(
     val certification: String? = null,
     val addedAtUtcMs: Long = 0L,
     val isAdult: Boolean = false,
+    /** Provider language tag, e.g. `LAT`, `SUB`, `ESP`, `DUAL`. */
+    val language: String? = null,
+    /** Provider quality tag, e.g. `HD`, `4K`. */
+    val quality: String? = null,
 )
 
 data class SeriesSummary(
@@ -78,6 +82,10 @@ data class SeriesSummary(
     val tmdbId: String? = null,
     val addedAtUtcMs: Long = 0L,
     val isAdult: Boolean = false,
+    /** Provider language tag, e.g. `LAT`, `SUB`, `ESP`, `DUAL`. */
+    val language: String? = null,
+    /** Provider quality tag, e.g. `HD`, `4K`. */
+    val quality: String? = null,
 )
 
 data class SeriesDetail(
@@ -87,6 +95,14 @@ data class SeriesDetail(
     val seasons: List<Season> = emptyList(),
     val certification: String? = null,
 )
+
+/** Badge text for a movie's provider variant. */
+val Movie.variantLabel: String?
+    get() = formatVariantLabel(language, quality)
+
+/** Badge text for a series' provider variant. */
+val SeriesSummary.variantLabel: String?
+    get() = formatVariantLabel(language, quality)
 
 data class Season(
     val number: Int,

@@ -45,6 +45,8 @@ fun CatalogueMovieEntity.toDomain(): Movie = Movie(
     certification = tmdbCertification.clean() ?: certification.clean(),
     addedAtUtcMs = addedAtUtcMs,
     isAdult = isAdult,
+    language = language,
+    quality = quality,
 )
 
 fun CatalogueSeriesEntity.toSummary(): SeriesSummary = SeriesSummary(
@@ -60,6 +62,8 @@ fun CatalogueSeriesEntity.toSummary(): SeriesSummary = SeriesSummary(
     tmdbId = tmdbId,
     addedAtUtcMs = addedAtUtcMs,
     isAdult = isAdult,
+    language = language,
+    quality = quality,
 )
 
 fun CatalogueSeriesEntity.toDetail(episodes: List<CatalogueEpisodeEntity>): SeriesDetail {

@@ -35,6 +35,7 @@ import com.markooverhaul.sunset.core.model.isInternalLiveCategory
 import com.markooverhaul.sunset.core.model.cleanCategoryDisplayName
 import com.markooverhaul.sunset.core.model.liveCategoryGroup
 import com.markooverhaul.sunset.core.model.parseLiveEventSchedule
+import com.markooverhaul.sunset.core.model.parseProviderVariant
 import com.markooverhaul.sunset.core.model.sanitizeProviderName
 import com.markooverhaul.sunset.core.network.tmdb.TmdbEnricher
 import java.text.SimpleDateFormat
@@ -694,10 +695,13 @@ class XtreamContentProvider @Inject constructor(
             .decodeFromString<List<XtreamVodStreamDto>>(body)
             .mapNotNull { dto ->
                 if (dto.streamId.isBlank()) return@mapNotNull null
-                val (title, year) = splitTitleYear(dto.name)
+                val variant = parseProviderVariant(dto.name)
+                val (title, year) = splitTitleYear(variant.title)
                 CatalogueMovieEntity(
                     id = dto.streamId,
                     categoryId = dto.categoryId,
+                    language = variant.language,
+                    quality = variant.quality,
                     title = title,
                     year = year,
                     posterUrl = dto.streamIcon.takeIf { it.isNotBlank() },
@@ -713,10 +717,13 @@ class XtreamContentProvider @Inject constructor(
             .decodeFromString<List<XtreamSeriesDto>>(body)
             .mapNotNull { dto ->
                 if (dto.seriesId.isBlank()) return@mapNotNull null
+                val variant = parseProviderVariant(dto.name)
                 CatalogueSeriesEntity(
                     id = dto.seriesId,
                     categoryId = dto.categoryId,
-                    title = dto.name,
+                    language = variant.language,
+                    quality = variant.quality,
+                    title = variant.title,
                     year = dto.releaseDate.take(4).toIntOrNull(),
                     posterUrl = dto.cover.takeIf { it.isNotBlank() },
                     rating = dto.rating.toDoubleOrNull(),
@@ -794,8 +801,11 @@ class XtreamContentProvider @Inject constructor(
             }
         }
         val now = System.currentTimeMillis()
+        val infoVariant = parseProviderVariant(info?.name.orEmpty())
         val updated = entity.copy(
-            title = info?.name?.takeIf { it.isNotBlank() } ?: entity.title,
+            title = infoVariant.title.takeIf { it.isNotBlank() } ?: entity.title,
+            language = infoVariant.language ?: entity.language,
+            quality = infoVariant.quality ?: entity.quality,
             posterUrl = info?.cover?.takeIf { it.isNotBlank() } ?: entity.posterUrl,
             backdropUrl = info?.backdrop?.firstOrNull { it.isNotBlank() } ?: entity.backdropUrl,
             rating = info?.rating?.toDoubleOrNull() ?: entity.rating,
