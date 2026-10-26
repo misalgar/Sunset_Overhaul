@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,9 +75,16 @@ private fun UpdateDialog(
     val primaryFocus = remember { FocusRequester() }
     val percent = (state.progress * 100f).roundToInt()
 
-    LaunchedEffect(state.downloading, state.needsPermission, state.error, manifest?.versionCode) {
-        if (!state.downloading) {
-            runCatching { primaryFocus.requestFocus() }
+    LaunchedEffect(Unit) {
+        // The dialog window needs a frame before its buttons can take focus. Retry briefly so a
+        // remote's first Select hits Install instead of falling behind the modal.
+        repeat(10) {
+            if (!state.downloading &&
+                runCatching { primaryFocus.requestFocus() }.isSuccess
+            ) {
+                return@LaunchedEffect
+            }
+            withFrameNanos { }
         }
     }
 

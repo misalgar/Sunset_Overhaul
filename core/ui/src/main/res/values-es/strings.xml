@@ -121,6 +121,7 @@
     <string name="live_open_guide">Abrir guía TV</string>
     <string name="live_guide_hint">Pulsa ◀ para las categorías</string>
     <string name="live_starts_at">Empieza %1$s</string>
+    <string name="live_status_live">En directo</string>
     <string name="live_group_genres">Géneros</string>
     <string name="live_group_events">Eventos en directo</string>
     <string name="live_group_countries">Países y regiones</string>

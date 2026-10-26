@@ -3,11 +3,13 @@ package com.markooverhaul.sunset.core.ui.components
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -31,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -38,6 +42,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -50,6 +55,7 @@ import com.markooverhaul.sunset.core.designsystem.components.SunsetProgressBar
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.model.LiveChannel
+import com.markooverhaul.sunset.core.ui.R
 
 /** On Now live card: logo, LIVE badge, channel name, current programme and progress. */
 @Composable
@@ -262,11 +268,18 @@ fun SunsetLiveChannelTile(
         shape = shape,
         scaleOnFocus = false,
     ) {
+        val cardColor = if (focused) Color(0xFF202836) else Color(0xFF161B24)
+        val borderColor = if (focused) {
+            SunsetColors.FocusRing
+        } else {
+            Color.White.copy(alpha = 0.08f)
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(76.dp)
-                .background(SunsetColors.BgSurface2),
+                .background(cardColor)
+                .border(1.dp, borderColor, shape),
         ) {
             Row(
                 modifier = Modifier
@@ -296,7 +309,7 @@ fun SunsetLiveChannelTile(
                     Row(
                         modifier = Modifier.padding(top = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         if (startsAtLabel != null) {
                             Icon(
@@ -313,13 +326,20 @@ fun SunsetLiveChannelTile(
                                 softWrap = false,
                             )
                         } else {
-                            LiveBadge()
-                        }
-                        if (!nowTitle.isNullOrBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(SunsetColors.SemanticLive, CircleShape),
+                            )
                             Text(
-                                text = nowTitle,
+                                text = nowTitle?.takeIf { it.isNotBlank() }
+                                    ?: stringResource(R.string.live_status_live),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = SunsetColors.TextSecondary,
+                                color = if (nowTitle.isNullOrBlank()) {
+                                    SunsetColors.TextTertiary
+                                } else {
+                                    SunsetColors.TextSecondary
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -334,20 +354,30 @@ fun SunsetLiveChannelTile(
                 )
             }
             if (progress != null) {
-                SunsetProgressBar(
-                    progress = progress,
+                Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .padding(start = 12.dp, end = 12.dp, bottom = 4.dp)
                         .fillMaxWidth()
-                        .height(2.dp),
-                )
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White.copy(alpha = 0.12f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .background(Color.White.copy(alpha = 0.45f)),
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * 56 dp logo framed on a subtle surface so transparent or mismatched artwork reads uniformly.
+ * 50 dp logo on a solid white badge so JPEG logos with baked-in white backgrounds look uniform
+ * against the deep slate card.
  */
 @Composable
 private fun FramedChannelLogo(
@@ -357,10 +387,10 @@ private fun FramedChannelLogo(
 ) {
     Box(
         modifier = modifier
-            .size(56.dp)
+            .size(50.dp)
             .background(
-                color = Color.White.copy(alpha = 0.06f),
-                shape = RoundedCornerShape(SunsetRadius.Sm),
+                color = Color.White,
+                shape = RoundedCornerShape(10.dp),
             )
             .padding(4.dp),
         contentAlignment = Alignment.Center,
@@ -376,7 +406,7 @@ private fun FramedChannelLogo(
             Text(
                 text = channelInitials(name),
                 style = MaterialTheme.typography.titleSmall,
-                color = SunsetColors.TextSecondary,
+                color = Color(0xFF161B24),
             )
         }
     }

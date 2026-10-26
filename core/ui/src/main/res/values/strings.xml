@@ -130,6 +130,7 @@
     <string name="live_open_guide">Open TV Guide</string>
     <string name="live_guide_hint">Press ◀ for categories</string>
     <string name="live_starts_at">Starts %1$s</string>
+    <string name="live_status_live">Live</string>
     <string name="live_group_genres">Genres</string>
     <string name="live_group_events">Live Events</string>
     <string name="live_group_countries">Countries &amp; Regions</string>

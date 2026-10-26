@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -41,9 +40,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -269,6 +271,7 @@ private fun LiveWideContent(
     val firstChannelRequester = remember { FocusRequester() }
     val entryFocus = LocalContentEntryFocus.current
     var previewFilter by remember { mutableStateOf<LiveFilter?>(null) }
+    var isGridFocused by remember { mutableStateOf(false) }
 
     val genreLabel = stringResource(R.string.live_group_genres)
     val eventsLabel = stringResource(R.string.live_group_events)
@@ -439,7 +442,7 @@ private fun LiveWideContent(
                     top = SunsetSpacing.Xl,
                 ),
         ) {
-            LiveGridHeader(entry = selectedEntry)
+            LiveGridHeader(entry = selectedEntry, showHint = isGridFocused)
 
             Spacer(modifier = Modifier.height(SunsetSpacing.Md))
 
@@ -454,7 +457,8 @@ private fun LiveWideContent(
                     state = gridState,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .onFocusChanged { isGridFocused = it.hasFocus },
                     horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
                     verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
                     contentPadding = PaddingValues(bottom = SunsetSpacing.Xl),
@@ -573,7 +577,8 @@ private fun LiveSidebarHeader(label: String) {
         style = MaterialTheme.typography.labelSmall,
         color = SunsetColors.TextTertiary,
         modifier = Modifier.padding(
-            start = SunsetSpacing.Xs,
+            start = 12.dp,
+            end = 8.dp,
             top = SunsetSpacing.Sm,
             bottom = SunsetSpacing.Xs,
         ),
@@ -624,18 +629,24 @@ private fun LiveSidebarFilterRow(
                     color = if (selected) SunsetColors.BgSurface3 else Color.Transparent,
                     shape = shape,
                 )
-                .padding(horizontal = SunsetSpacing.Sm, vertical = SunsetSpacing.Sm),
+                .drawBehind {
+                    if (selected) {
+                        drawRect(
+                            color = SunsetColors.AccentPrimary,
+                            topLeft = Offset.Zero,
+                            size = Size(2.dp.toPx(), this.size.height),
+                        )
+                    }
+                }
+                .padding(
+                    start = 12.dp,
+                    end = 8.dp,
+                    top = SunsetSpacing.Sm,
+                    bottom = SunsetSpacing.Sm,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Sm),
         ) {
-            Box(
-                modifier = Modifier
-                    .width(2.dp)
-                    .height(16.dp)
-                    .background(
-                        if (selected) SunsetColors.AccentPrimary else Color.Transparent,
-                    ),
-            )
             if (entry.filter == LiveFilter.Favourites) {
                 Icon(
                     imageVector = Icons.Filled.Star,
@@ -649,7 +660,7 @@ private fun LiveSidebarFilterRow(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelLarge,
                 color = if (selected) SunsetColors.AccentPrimary else SunsetColors.TextSecondary,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
@@ -664,7 +675,7 @@ private fun LiveSidebarFilterRow(
 }
 
 @Composable
-private fun LiveGridHeader(entry: LiveFilterEntry) {
+private fun LiveGridHeader(entry: LiveFilterEntry, showHint: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -688,12 +699,14 @@ private fun LiveGridHeader(entry: LiveFilterEntry) {
                 maxLines = 1,
             )
         }
-        Text(
-            text = stringResource(R.string.live_guide_hint),
-            style = MaterialTheme.typography.labelMedium,
-            color = SunsetColors.TextTertiary,
-            maxLines = 1,
-        )
+        if (showHint) {
+            Text(
+                text = stringResource(R.string.live_guide_hint),
+                style = MaterialTheme.typography.labelMedium,
+                color = SunsetColors.TextSecondary,
+                maxLines = 1,
+            )
+        }
     }
 }
 

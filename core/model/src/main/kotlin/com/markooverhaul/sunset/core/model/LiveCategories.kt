@@ -28,14 +28,22 @@ fun sanitizeProviderName(raw: String): String = raw
     .trim()
 
 private val CategoryDate = Regex("""\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b""")
+private val LiveSoccerCategory = Regex(
+    """^\s*Live\s+Soccer\s+(.+)$""",
+    RegexOption.IGNORE_CASE,
+)
 
 /**
  * Category names read like panel data (`NFL 25/10/26`). The sidebar shows the friendly form
  * (`NFL • Oct 25`) while the raw name stays available for schedule parsing and PPV detection.
+ * `Live Soccer Domingo` becomes `Soccer • Domingo` so it fits the sidebar on one line.
  */
 fun cleanCategoryDisplayName(raw: String): String {
     val months = java.text.DateFormatSymbols.getInstance().shortMonths
-    return CategoryDate.replace(sanitizeProviderName(raw)) { match ->
+    val shortened = LiveSoccerCategory.replace(sanitizeProviderName(raw)) { match ->
+        "Soccer • ${match.groupValues[1].trim()}"
+    }
+    return CategoryDate.replace(shortened) { match ->
         val day = match.groupValues[1].toIntOrNull()
         val month = match.groupValues[2].toIntOrNull()
         if (day == null || month == null || month !in 1..12 || day !in 1..31) {
@@ -81,7 +89,7 @@ fun isAdultChannel(name: String, categoryNames: Iterable<String?>): Boolean =
     isAdultName(name) || categoryNames.any { it != null && isAdultName(it) }
 
 /** Sidebar grouping: pinned filters are UI-level; provider categories fall into these buckets. */
-enum class LiveCategoryGroup { LiveEvents, Genres, Countries }
+enum class LiveCategoryGroup { Genres, LiveEvents, Countries }
 
 private val EventDate = Regex("""\b\d{1,2}/\d{1,2}/\d{2,4}\b""")
 private val EventKeywords = listOf(
