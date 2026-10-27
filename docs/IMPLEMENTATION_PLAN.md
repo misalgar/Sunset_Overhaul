@@ -750,6 +750,29 @@ the nav then Down returns to the box, and a `verity` search focuses the first re
 results lands on the filter row and Down returns to the first result.
 `:app:assembleDebug testDebugUnitTest :app:lintDebug` passes with lint errors = 0.
 
+### 5.34 The Search clear button must be a focus stop on TV (2026-10-27)
+
+Symptom: with a query in the Search box, the remote could not reach or activate the X, so the only
+way to clear a search was to reopen the keyboard and erase it.
+
+Cause: the X is `SunsetSearchField`'s `trailingIcon`, which lives inside the text field. A text field
+consumes Left/Right for the cursor, so nothing inside it can take focus from the D-pad — and while
+the box is not in edit mode the field itself is not even focusable. The X was therefore reachable
+with a mouse or finger, but invisible to the remote.
+
+- `SunsetSearchField` takes `showClearAction` (default true). When false it hides its own icon and
+  reserves the same 48 dp so the text cannot run under the caller's control.
+- `SearchScreen` passes `showClearAction = !isTv` and, on TV, overlays a `SunsetFocusable` circle in
+  the same place: Right from the box focuses it, Select clears the query and returns focus to the
+  box (the X disappears with the query), Left goes back to the box, Down goes to the results, Up
+  leaves for the nav. The box's key handler ignores keys while the X holds focus so Select cannot
+  re-open the IME instead of clearing.
+
+Verification on Fire TV (1920x1080, density 320): Right from a filled box rings the X; Left returns
+to the box; Select on the X empties the field, hides the X and leaves the box focused with the recent
+searches showing; Down from the X focuses the first result. The phone path still uses the built-in
+trailing icon.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
