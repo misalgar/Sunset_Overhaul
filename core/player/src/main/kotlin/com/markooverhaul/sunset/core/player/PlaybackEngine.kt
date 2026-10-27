@@ -54,5 +54,7 @@ interface PlaybackEngine {
     fun setAspect(mode: AspectMode)
     fun selectAudio(trackId: String?)
     fun selectSubtitle(trackId: String?)
+    /** Mutes the output; used by muted live previews. */
+    fun setMuted(muted: Boolean)
     fun release()
 }

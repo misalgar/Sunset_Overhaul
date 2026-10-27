@@ -130,6 +130,7 @@
     <string name="live_open_guide">Open TV Guide</string>
     <string name="live_guide_hint">Press ◀ for categories</string>
     <string name="live_starts_at">Starts %1$s</string>
+    <string name="live_hero_hint">Browse the channels to preview what is on now.</string>
     <string name="live_status_live">Live</string>
     <string name="live_group_genres">Genres</string>
     <string name="live_group_events">Live Events</string>
@@ -324,8 +325,8 @@
     <string name="player_preparing">Preparing video…</string>
     <string name="player_controls">Player controls</string>
     <string name="player_seek">Seek</string>
-    <string name="player_live_hint">Live demo playback uses the bundled sample. Seeking is disabled.</string>
-    <string name="player_live_seek_hint">Live stream. Seeking is disabled.</string>
+    <string name="player_live_hint">Live demo playback uses the bundled sample. Seeking is disabled. Up and down change channel.</string>
+    <string name="player_live_seek_hint">Live stream. Seeking is disabled. Up and down change channel.</string>
     <string name="player_close_controls">Hide controls</string>
 
     <!-- Parental -->

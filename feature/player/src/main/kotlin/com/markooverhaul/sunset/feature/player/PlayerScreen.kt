@@ -91,6 +91,7 @@ fun PlayerRoute(
         onTogglePlayPause = viewModel::togglePlayPause,
         onSeekBy = viewModel::seekBy,
         onSeekTo = viewModel::seekTo,
+        onZap = viewModel::zap,
         onRetry = viewModel::retry,
         modifier = modifier,
     )
@@ -109,6 +110,7 @@ fun PlayerScreen(
     onTogglePlayPause: () -> Unit,
     onSeekBy: (Long) -> Unit,
     onSeekTo: (Long) -> Unit,
+    onZap: (Int) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -123,14 +125,12 @@ fun PlayerScreen(
         runCatching { focusRequester.requestFocus() }
     }
 
-    // The player root stays focused while the error overlay is visible so the D-pad reliably
-    // switches between Retry and Exit. The overlay buttons are visual/touch targets only.
-    LaunchedEffect(error) {
-        if (error) {
-            errorAction = PlayerErrorAction.Retry
-            delay(100)
-            runCatching { focusRequester.requestFocus() }
-        }
+    // The player root owns the D-pad, including while the error overlay is visible and right after
+    // a channel switch reattaches the surface. The overlay buttons are touch targets only.
+    LaunchedEffect(error, state.isResolving) {
+        if (error) errorAction = PlayerErrorAction.Retry
+        delay(100)
+        runCatching { focusRequester.requestFocus() }
     }
 
     LaunchedEffect(playback.isPlaying, controlsVisible) {
@@ -171,6 +171,25 @@ fun PlayerScreen(
                             true
                         }
 
+                        // A dead channel must not trap the viewer: keep zapping on live.
+                        Key.DirectionUp -> {
+                            if (state.live) {
+                                onZap(-1)
+                                true
+                            } else {
+                                false
+                            }
+                        }
+
+                        Key.DirectionDown -> {
+                            if (state.live) {
+                                onZap(1)
+                                true
+                            } else {
+                                false
+                            }
+                        }
+
                         else -> false
                     }
                 }
@@ -193,6 +212,27 @@ fun PlayerScreen(
                     Key.DirectionRight -> {
                         if (event.type == KeyEventType.KeyDown) handleSeek(SEEK_STEP_MS)
                         true
+                    }
+
+                    // Live only: up/down zap through the channel list the viewer came from.
+                    Key.DirectionUp -> {
+                        if (event.type == KeyEventType.KeyDown && state.live) {
+                            controlsVisible = true
+                            onZap(-1)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+
+                    Key.DirectionDown -> {
+                        if (event.type == KeyEventType.KeyDown && state.live) {
+                            controlsVisible = true
+                            onZap(1)
+                            true
+                        } else {
+                            false
+                        }
                     }
 
                     else -> false
@@ -236,6 +276,7 @@ fun PlayerScreen(
 
         when {
             error -> PlayerErrorOverlay(
+                title = state.title,
                 message = if (state.resolveError != null) {
                     providerErrorText(state.resolveError)
                 } else {
@@ -455,15 +496,18 @@ private fun PlayerControls(
                     )
                 }
             }
-            Text(
-                text = if (playback.ended) {
-                    stringResource(R.string.player_ended)
-                } else {
-                    stringResource(R.string.player_controls_hint)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = SunsetColors.TextTertiary,
-            )
+            // Seeking does not apply to live; the live hint above already covers the D-pad.
+            if (!live) {
+                Text(
+                    text = if (playback.ended) {
+                        stringResource(R.string.player_ended)
+                    } else {
+                        stringResource(R.string.player_controls_hint)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SunsetColors.TextTertiary,
+                )
+            }
         }
     }
 }
@@ -494,6 +538,7 @@ private fun PlayerControlButton(
 
 @Composable
 private fun PlayerErrorOverlay(
+    title: String,
     message: String,
     failure: PlaybackFailure?,
     live: Boolean,
@@ -521,6 +566,14 @@ private fun PlayerErrorOverlay(
                 style = MaterialTheme.typography.headlineMedium,
                 color = SunsetColors.TextPrimary,
             )
+            if (title.isNotBlank()) {
+                // Names the channel so zapping past a dead feed is understandable.
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SunsetColors.TextPrimary,
+                )
+            }
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,

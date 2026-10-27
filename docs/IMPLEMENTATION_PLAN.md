@@ -636,6 +636,37 @@ Follow-up: movie cards no longer show the language/quality badge (the version is
 details). The details hero shows it only when a title has more than one version. Series keep their
 badge until they are grouped the same way.
 
+### 5.29 Live playback: zapping, Back focus, PPV tiles (2026-10-26)
+
+- Up/Down in the live player changes channel through the list the viewer came from
+  (`LivePlaybackQueue`, set by Live/Pay Per View with the visible order and category). It wraps at
+  the ends, works while the error overlay is up, and adds no provider requests: it only resolves
+  cached channels.
+- The video surface is no longer focusable, and the player root re-requests focus whenever
+  playback state changes, so D-pad keys are never swallowed after a reattach.
+- Back from playback returns to Live with the watched channel scrolled into view and focused, in
+  the same category. `LivePlaybackQueue.lastPlayedChannelId` survives navigation.
+- Pay Per View uses the same 2-column `SunsetLiveChannelTile` grid as Live TV: event start times
+  ("Starts …"), live status, EPG progress and the event name. `rememberChannelStatus` is shared so
+  the two screens cannot drift. PPV zapping stays inside the event list.
+- The error overlay names the failed channel and shows the D-pad zapping hint on live.
+
+### 5.30 Live hero preview (2026-10-26)
+
+- A guide-style hero occupies ~32% of the content area above the master-detail layout: focused
+  channel name, current programme title, time range and up to three description lines.
+- The right side is a 16:9 panel with a bottom gradient and a 2 dp live-progress line. It shows the
+  programme/EPG art immediately and switches to a muted video preview once the viewer rests on the
+  channel for 1.5 s (`LiveViewModel.focusedChannel` / `previewChannel`).
+- `LivePreviewViewModel` owns a separate muted `PlaybackEngine` (new `setMuted` on the engine) and
+  pauses on `ON_STOP`, so no decoder runs behind the full-screen player or another destination.
+- Focus wiring: the tile's own `onFocusChanged` reports the channel; leaving the grid clears both
+  focus states and stops the preview. Focus is also cleared on category changes.
+
+Verified on Fire TV: zapping across Trev→MegaTV→Telemundo (including dead feeds), Back restoring
+Telemundo San Juan with its 6–8 PM guide entry, the PPV tile grid, and the preview starting after
+the rest delay and resuming after Back.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

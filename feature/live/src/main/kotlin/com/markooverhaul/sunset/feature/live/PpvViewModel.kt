@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markooverhaul.sunset.core.common.IoDispatcher
 import com.markooverhaul.sunset.core.data.repository.FavouritesRepository
+import com.markooverhaul.sunset.core.data.repository.LivePlaybackQueue
 import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.ContentType
@@ -52,6 +53,7 @@ data class PpvUiState(
 class PpvViewModel @Inject constructor(
     private val provider: ContentProvider,
     private val favouritesRepository: FavouritesRepository,
+    private val liveQueue: LivePlaybackQueue,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -79,6 +81,12 @@ class PpvViewModel @Inject constructor(
         viewModelScope.launch {
             favouritesRepository.toggle(channel.id, ContentType.LIVE)
         }
+    }
+
+    /** PPV zaps through the event list the viewer picked from, not the whole Live TV lineup. */
+    fun onChannelPlayed(channel: LiveChannel) {
+        liveQueue.setQueue(_state.value.visibleChannels.map { it.id }, _state.value.selectedCategoryId)
+        liveQueue.markPlayed(channel.id)
     }
 
     fun refresh() {

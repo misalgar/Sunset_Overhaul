@@ -225,6 +225,7 @@ fun SunsetLiveChannelTile(
     modifier: Modifier = Modifier,
     progress: Float? = null,
     startsAtLabel: String? = null,
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     // A held Select arrives as repeated KeyDown events. The first repeat toggles the favourite and
     // the clickable's KeyUp click is swallowed, so the channel does not also start playing.
@@ -248,6 +249,7 @@ fun SunsetLiveChannelTile(
         onFocusChanged = { isFocused ->
             focused = isFocused
             if (!isFocused) longPressHandled = false
+            onFocusChanged(isFocused)
         },
         modifier = modifier
             .onPreviewKeyEvent { event ->

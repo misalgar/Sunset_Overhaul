@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markooverhaul.sunset.core.common.IoDispatcher
 import com.markooverhaul.sunset.core.data.repository.FavouritesRepository
+import com.markooverhaul.sunset.core.data.repository.LivePlaybackQueue
 import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.ContentType
@@ -16,7 +17,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,11 +96,25 @@ data class LiveUiState(
 class LiveViewModel @Inject constructor(
     private val provider: ContentProvider,
     private val favouritesRepository: FavouritesRepository,
+    private val liveQueue: LivePlaybackQueue,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LiveUiState())
     val state = _state.asStateFlow()
+
+    /** Instant focus, used for the hero's text. Null until the viewer focuses a channel. */
+    private val _focusedChannel = MutableStateFlow<LiveChannel?>(null)
+    val focusedChannel = _focusedChannel.asStateFlow()
+
+    /** Delayed focus, used for video. Stays null until the viewer rests on a channel. */
+    private val _previewChannel = MutableStateFlow<LiveChannel?>(null)
+    val previewChannel = _previewChannel.asStateFlow()
+
+    private var previewDebounceJob: Job? = null
+
+    /** Set by the player so the Live screen can put focus back on the watched channel. */
+    val lastPlayedChannelId = liveQueue.lastPlayedChannelId
 
     init {
         viewModelScope.launch {
@@ -110,12 +127,43 @@ class LiveViewModel @Inject constructor(
 
     fun selectFilter(filter: LiveFilter) {
         _state.update { it.copy(selectedFilter = filter) }
+        clearFocus()
     }
 
     fun toggleFavourite(channel: LiveChannel) {
         viewModelScope.launch {
             favouritesRepository.toggle(channel.id, ContentType.LIVE)
         }
+    }
+
+    /** Remembers the list the viewer picked the channel from, so the player can zap up/down. */
+    fun onChannelPlayed(channel: LiveChannel) {
+        val categoryId = (_state.value.selectedFilter as? LiveFilter.Category)?.id
+        liveQueue.setQueue(_state.value.visibleChannels.map { it.id }, categoryId)
+        liveQueue.markPlayed(channel.id)
+    }
+
+    /**
+     * Focus moves instantly, but the preview engine only starts after the viewer rests on a
+     * channel, so fast D-pad travel does not thrash the decoder or the network.
+     */
+    fun onChannelFocused(channel: LiveChannel) {
+        if (_focusedChannel.value?.id == channel.id) return
+        _focusedChannel.value = channel
+        _previewChannel.value = null
+        previewDebounceJob?.cancel()
+        previewDebounceJob = viewModelScope.launch {
+            delay(PREVIEW_REST_MS)
+            _previewChannel.value = channel
+        }
+    }
+
+    /** Called when focus leaves the grid, so the hero resets and the preview stops. */
+    fun clearFocus() {
+        previewDebounceJob?.cancel()
+        previewDebounceJob = null
+        _focusedChannel.value = null
+        _previewChannel.value = null
     }
 
     fun load() {
@@ -194,5 +242,10 @@ class LiveViewModel @Inject constructor(
                 _state.update { it.copy(isLoading = false, error = error) }
             }
         }
+    }
+
+    private companion object {
+        /** Time the viewer must rest on a channel before the video preview starts. */
+        const val PREVIEW_REST_MS = 1_500L
     }
 }

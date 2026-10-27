@@ -51,6 +51,7 @@ class Media3PlaybackEngine @Inject constructor(
     internal val playerFlow = MutableStateFlow<ExoPlayer?>(null)
 
     private var live = false
+    private var muted = false
     private var positionJob: Job? = null
 
     private val listener = object : Player.Listener {
@@ -100,6 +101,7 @@ class Media3PlaybackEngine @Inject constructor(
 
             val player = ExoPlayer.Builder(context).build().also {
                 it.addListener(listener)
+                it.volume = if (muted) 0f else 1f
                 playerFlow.value = it
             }
 
@@ -160,6 +162,11 @@ class Media3PlaybackEngine @Inject constructor(
     override fun selectAudio(trackId: String?) = Unit
 
     override fun selectSubtitle(trackId: String?) = Unit
+
+    override fun setMuted(muted: Boolean) {
+        this.muted = muted
+        playerFlow.value?.volume = if (muted) 0f else 1f
+    }
 
     override fun release() {
         positionJob?.cancel()

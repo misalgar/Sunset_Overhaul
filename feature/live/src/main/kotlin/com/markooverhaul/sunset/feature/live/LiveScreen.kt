@@ -59,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markooverhaul.sunset.core.designsystem.components.CategoryChip
 import com.markooverhaul.sunset.core.designsystem.components.SunsetEmptyState
@@ -70,9 +72,9 @@ import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetSpacing
-import com.markooverhaul.sunset.core.model.LIVE_EVENT_START_GRACE_MS
 import com.markooverhaul.sunset.core.model.LiveCategoryGroup
 import com.markooverhaul.sunset.core.model.LiveChannel
+import com.markooverhaul.sunset.core.player.PlaybackEngine
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelRow
@@ -93,15 +95,38 @@ fun LiveRoute(
     onOpenGuide: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LiveViewModel = hiltViewModel(),
+    previewViewModel: LivePreviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val focusedChannel by viewModel.focusedChannel.collectAsStateWithLifecycle()
+    val previewChannel by viewModel.previewChannel.collectAsStateWithLifecycle()
+    val lastPlayedChannelId by viewModel.lastPlayedChannelId.collectAsStateWithLifecycle()
+
+    // Drives the muted preview engine from the rested-on channel, and never while the screen is
+    // hidden behind the full-screen player.
+    LaunchedEffect(previewChannel?.id) {
+        previewViewModel.preview(previewChannel)
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        previewViewModel.stop()
+    }
+
     LiveScreen(
         state = state,
-        onPlayChannel = onPlayChannel,
+        onPlayChannel = { channel ->
+            viewModel.onChannelPlayed(channel)
+            onPlayChannel(channel)
+        },
         onOpenGuide = onOpenGuide,
         onSelectFilter = viewModel::selectFilter,
         onToggleFavourite = viewModel::toggleFavourite,
         onRetry = viewModel::load,
+        focusedChannel = focusedChannel,
+        previewChannel = previewChannel,
+        previewEngine = previewViewModel.engine,
+        lastPlayedChannelId = lastPlayedChannelId,
+        onChannelFocused = viewModel::onChannelFocused,
+        onClearFocus = viewModel::clearFocus,
         modifier = modifier,
     )
 }
@@ -114,6 +139,12 @@ fun LiveScreen(
     onSelectFilter: (LiveFilter) -> Unit,
     onToggleFavourite: (LiveChannel) -> Unit,
     onRetry: () -> Unit,
+    focusedChannel: LiveChannel? = null,
+    previewChannel: LiveChannel? = null,
+    previewEngine: PlaybackEngine? = null,
+    lastPlayedChannelId: String? = null,
+    onChannelFocused: (LiveChannel) -> Unit = {},
+    onClearFocus: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isTv = LocalIsTelevision.current
@@ -130,6 +161,8 @@ fun LiveScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isWide = isTv || maxWidth >= WideLayoutMinWidth
         val gutter = if (isTv) SunsetSpacing.Xxxl else SunsetSpacing.Lg
+        // Keep the hero to roughly a third of the content area so two channel rows stay visible.
+        val heroHeight = maxHeight * 0.32f
 
         Column(modifier = Modifier.fillMaxSize()) {
             SunsetDemoBanner()
@@ -152,17 +185,35 @@ fun LiveScreen(
                     modifier = Modifier.padding(horizontal = gutter),
                 )
 
-                isWide -> LiveWideContent(
-                    state = state,
-                    entries = entries,
-                    gutter = gutter,
-                    nowMs = nowMs,
-                    onPlayChannel = onPlayChannel,
-                    onOpenGuide = onOpenGuide,
-                    onSelectFilter = onSelectFilter,
-                    onToggleFavourite = onToggleFavourite,
-                    onRetry = onRetry,
-                )
+                isWide -> Column(modifier = Modifier.fillMaxSize()) {
+                    SunsetHeroPreviewHeader(
+                        focusedChannel = focusedChannel,
+                        previewChannel = previewChannel,
+                        programme = focusedChannel?.let { state.programmes[it.id] },
+                        previewEngine = previewEngine,
+                        nowMs = nowMs,
+                        height = heroHeight,
+                        modifier = Modifier
+                            .padding(horizontal = gutter)
+                            .padding(top = SunsetSpacing.Sm),
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LiveWideContent(
+                        state = state,
+                        entries = entries,
+                        gutter = gutter,
+                        nowMs = nowMs,
+                        lastPlayedChannelId = lastPlayedChannelId,
+                        onChannelFocused = onChannelFocused,
+                        onClearFocus = onClearFocus,
+                        onPlayChannel = onPlayChannel,
+                        onOpenGuide = onOpenGuide,
+                        onSelectFilter = onSelectFilter,
+                        onToggleFavourite = onToggleFavourite,
+                        onRetry = onRetry,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
 
                 else -> LiveCompactContent(
                     state = state,
@@ -257,13 +308,16 @@ private fun LiveWideContent(
     entries: List<LiveFilterEntry>,
     gutter: Dp,
     nowMs: Long,
+    lastPlayedChannelId: String?,
+    onChannelFocused: (LiveChannel) -> Unit,
+    onClearFocus: () -> Unit,
     onPlayChannel: (LiveChannel) -> Unit,
     onOpenGuide: () -> Unit,
     onSelectFilter: (LiveFilter) -> Unit,
     onToggleFavourite: (LiveChannel) -> Unit,
     onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sidebarState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -323,6 +377,24 @@ private fun LiveWideContent(
         runCatching { gridState.scrollToItem(0) }
     }
 
+    // Back from the player lands here with the watched channel remembered: scroll it into view and
+    // take focus, so the viewer resumes exactly where they were in the category.
+    var restoreTargetId by remember { mutableStateOf(lastPlayedChannelId) }
+    val restoreRequester = remember { FocusRequester() }
+    LaunchedEffect(state.visibleChannels, restoreTargetId) {
+        val target = restoreTargetId ?: return@LaunchedEffect
+        val index = state.visibleChannels.indexOfFirst { it.id == target }
+        if (index < 0) {
+            restoreTargetId = null
+            return@LaunchedEffect
+        }
+        delay(80)
+        runCatching { gridState.scrollToItem(index) }
+        delay(60)
+        runCatching { restoreRequester.requestFocus() }
+        restoreTargetId = null
+    }
+
     suspend fun focusSelectedCategory() {
         if (state.selectedFilter == LiveFilter.All) {
             (entryFocus ?: selectedCategoryRequester).requestFocusWhenReady()
@@ -349,7 +421,7 @@ private fun LiveWideContent(
         firstChannelRequester.requestFocusWhenReady()
     }
 
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .weight(0.27f)
@@ -458,7 +530,10 @@ private fun LiveWideContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .onFocusChanged { isGridFocused = it.hasFocus },
+                        .onFocusChanged {
+                            isGridFocused = it.hasFocus
+                            if (!it.hasFocus) onClearFocus()
+                        },
                     horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
                     verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
                     contentPadding = PaddingValues(bottom = SunsetSpacing.Xl),
@@ -468,25 +543,7 @@ private fun LiveWideContent(
                         key = { _, channel -> channel.id },
                     ) { index, channel ->
                         val programme = state.programmes[channel.id]?.now
-                        val start = channel.scheduledStartUtcMs
-                        val scheduled = start != null &&
-                            nowMs < start - LIVE_EVENT_START_GRACE_MS
-                        val startsAtLabel = if (start != null && scheduled) {
-                            stringResource(
-                                R.string.live_starts_at,
-                                SunsetFormat.time(context, start),
-                            )
-                        } else {
-                            null
-                        }
-                        val progress = if (!scheduled) {
-                            programme?.let {
-                                val span = (it.endUtcMs - it.startUtcMs).coerceAtLeast(1L)
-                                ((nowMs - it.startUtcMs).toFloat() / span).coerceIn(0f, 1f)
-                            }
-                        } else {
-                            null
-                        }
+                        val status = rememberChannelStatus(channel, programme, nowMs)
                         SunsetLiveChannelTile(
                             channel = channel,
                             nowTitle = programme?.title,
@@ -495,12 +552,22 @@ private fun LiveWideContent(
                             unfavouriteLabel = stringResource(R.string.live_unfavourite),
                             onPlay = { onPlayChannel(channel) },
                             onToggleFavourite = { onToggleFavourite(channel) },
-                            progress = progress,
-                            startsAtLabel = startsAtLabel,
+                            progress = status.progress,
+                            startsAtLabel = status.startsAtLabel,
+                            onFocusChanged = { isFocused ->
+                                if (isFocused) onChannelFocused(channel)
+                            },
                             modifier = Modifier
                                 .then(
                                     if (index == 0) {
                                         Modifier.focusRequester(firstChannelRequester)
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .then(
+                                    if (channel.id == restoreTargetId) {
+                                        Modifier.focusRequester(restoreRequester)
                                     } else {
                                         Modifier
                                     },

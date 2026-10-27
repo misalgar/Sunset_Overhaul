@@ -35,6 +35,10 @@ fun PlaybackSurface(
                 setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                 setBackgroundColor(android.graphics.Color.BLACK)
                 keepScreenOn = true
+                // The Compose root owns the D-pad (zapping, controls, back); the surface must never
+                // take focus away from it, or keys are swallowed after a reattach.
+                isFocusable = false
+                isFocusableInTouchMode = false
             }
         },
         update = { view ->

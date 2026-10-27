@@ -121,6 +121,7 @@
     <string name="live_open_guide">Abrir guía TV</string>
     <string name="live_guide_hint">Pulsa ◀ para las categorías</string>
     <string name="live_starts_at">Empieza %1$s</string>
+    <string name="live_hero_hint">Explora los canales para ver qué hay ahora.</string>
     <string name="live_status_live">En directo</string>
     <string name="live_group_genres">Géneros</string>
     <string name="live_group_events">Eventos en directo</string>
@@ -307,8 +308,8 @@
     <string name="player_preparing">Preparando el vídeo…</string>
     <string name="player_controls">Controles del reproductor</string>
     <string name="player_seek">Buscar</string>
-    <string name="player_live_hint">La reproducción en directo de demostración usa el vídeo incluido. La búsqueda está desactivada.</string>
-    <string name="player_live_seek_hint">Emisión en directo. La búsqueda está desactivada.</string>
+    <string name="player_live_hint">La reproducción en directo de demostración usa el vídeo incluido. La búsqueda está desactivada. Arriba y abajo cambian de canal.</string>
+    <string name="player_live_seek_hint">Emisión en directo. La búsqueda está desactivada. Arriba y abajo cambian de canal.</string>
     <string name="player_close_controls">Ocultar controles</string>
 
     <string name="parental_title">Control parental</string>

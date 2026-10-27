@@ -4,10 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markooverhaul.sunset.core.common.IoDispatcher
+import com.markooverhaul.sunset.core.data.repository.LivePlaybackQueue
 import com.markooverhaul.sunset.core.data.repository.ProgressRepository
 import com.markooverhaul.sunset.core.data.repository.SettingsRepository
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.ContentType
+import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.model.StreamRequest
 import com.markooverhaul.sunset.core.model.WatchProgress
 import com.markooverhaul.sunset.core.player.PlaybackEngine
@@ -51,6 +53,7 @@ class PlayerViewModel @Inject constructor(
     private val provider: ContentProvider,
     private val progressRepository: ProgressRepository,
     private val settingsRepository: SettingsRepository,
+    private val liveQueue: LivePlaybackQueue,
     val engine: PlaybackEngine,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -59,7 +62,8 @@ class PlayerViewModel @Inject constructor(
         ContentType.valueOf(savedStateHandle.get<String>(ARG_TYPE).orEmpty())
     }.getOrDefault(ContentType.MOVIE)
 
-    private val contentId: String = savedStateHandle.get<String>(ARG_ID).orEmpty()
+    /** Changes when the viewer zaps to another live channel. */
+    private var contentId: String = savedStateHandle.get<String>(ARG_ID).orEmpty()
     private val displayTitle: String = savedStateHandle.get<String>(ARG_TITLE).orEmpty()
 
     private var episodeId: String? =
@@ -135,7 +139,65 @@ class PlayerViewModel @Inject constructor(
         engine.seekTo(positionMs)
     }
 
+    /**
+     * Live channel zapping: up moves to the previous channel in the list the viewer came from,
+     * down to the next, wrapping at the ends. Uses cached channels only, so no provider request.
+     */
+    fun zap(direction: Int) {
+        if (!live) return
+        val channels = zappingChannels()
+        if (channels.size < 2) return
+        val index = channels.indexOfFirst { it.id == contentId }
+        val nextIndex = if (index < 0) 0 else Math.floorMod(index + direction, channels.size)
+        val next = channels[nextIndex]
+        if (next.id == contentId) return
+        viewModelScope.launch { switchChannel(next) }
+    }
+
+    private fun zappingChannels(): List<LiveChannel> {
+        val all = provider.cachedLiveChannels()
+        val byId = all.associateBy { it.id }
+        val ordered = liveQueue.channelIds.mapNotNull { byId[it] }
+        // Opened from Search, Home or the guide: fall back to the full live list.
+        if (ordered.any { it.id == contentId }) return ordered
+        return all.filterNot { it.isAdult }.ifEmpty { all }
+    }
+
+    private suspend fun switchChannel(channel: LiveChannel) {
+        contentId = channel.id
+        liveQueue.markPlayed(channel.id)
+        _state.update {
+            it.copy(
+                title = channel.name,
+                subtitle = null,
+                isResolving = true,
+                resolveError = null,
+                scheduledStartUtcMs = channel.scheduledStartUtcMs,
+            )
+        }
+        try {
+            val source = withContext(ioDispatcher) {
+                provider.resolveStream(
+                    StreamRequest(
+                        contentType = ContentType.LIVE,
+                        contentId = channel.id,
+                        startPositionMs = 0L,
+                        live = true,
+                    ),
+                )
+            }
+            engine.prepare(source, 0L, live = true)
+            started = true
+            _state.update { it.copy(isResolving = false) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            _state.update { it.copy(isResolving = false, resolveError = error) }
+        }
+    }
+
     private suspend fun start() {
+        if (live) liveQueue.markPlayed(contentId)
         _state.update {
             it.copy(
                 isResolving = true,
