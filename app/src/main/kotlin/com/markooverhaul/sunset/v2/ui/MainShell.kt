@@ -32,10 +32,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -137,15 +140,27 @@ fun MainShell(
     val contentEntryFocus = remember { FocusRequester() }
 
     // A top-level destination can be restored with no focus target at all (for example Back from
-    // Live TV to a Home that is scrolled past its hero), which makes the D-pad dead. Re-attach
-    // focus to the screen's entry item whenever a top-level route becomes current.
+    // Live TV to a Home that is scrolled past its hero), which makes the D-pad dead. Keep asking
+    // the screen to focus its entry item until something inside the content actually has focus:
+    // requestFocus() also returns success for a node left over from the outgoing screen.
+    val contentHasFocus = remember { mutableStateOf(false) }
+    val currentContentHasFocus by rememberUpdatedState(contentHasFocus.value)
+    val view = androidx.compose.ui.platform.LocalView.current
     LaunchedEffect(currentRoute) {
         if (!showTopBar) return@LaunchedEffect
-        repeat(10) {
+        // Touch mode (a stray tap, or a hybrid remote) leaves the window with no focused view, and
+        // Compose then silently ignores every focus request until a key press arrives. Leaving
+        // touch mode restores Android view focus so the entry request below actually lands.
+        // The flag also has to be reset: the outgoing destination still owns focus during the
+        // transition, so a leftover "true" would make this loop exit without doing anything.
+        contentHasFocus.value = false
+        repeat(12) {
             delay(100)
-            if (runCatching { contentEntryFocus.requestFocus() }.isSuccess) {
-                return@LaunchedEffect
-            }
+            if (isTv && !view.isFocused) runCatching { view.requestFocusFromTouch() }
+            if (currentContentHasFocus) return@LaunchedEffect
+            runCatching { contentEntryFocus.requestFocus() }
+            delay(60)
+            if (currentContentHasFocus) return@LaunchedEffect
         }
     }
 
@@ -172,11 +187,17 @@ fun MainShell(
         },
     ) { padding ->
         CompositionLocalProvider(LocalContentEntryFocus provides contentEntryFocus) {
-            SunsetNavHost(
-                navController = navController,
-                demoMode = demoMode,
-                modifier = Modifier.padding(padding),
-            )
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .padding(padding)
+                    .onFocusChanged { contentHasFocus.value = it.hasFocus },
+            ) {
+                SunsetNavHost(
+                    navController = navController,
+                    demoMode = demoMode,
+                    modifier = Modifier,
+                )
+            }
         }
     }
 }

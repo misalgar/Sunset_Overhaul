@@ -1,6 +1,5 @@
-﻿package com.markooverhaul.sunset.feature.home
+package com.markooverhaul.sunset.feature.home
 
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -117,7 +116,7 @@ fun HomeScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val gutter = if (isTv) 48.dp else 16.dp
         val itemSpacing = if (isTv) 16.dp else 12.dp
-        // 6 columns on TV (spec Â§7.5) and never larger than 176 dp, so a full row plus captions
+        // 6 columns on TV (spec §7.5) and never larger than 176 dp, so a full row plus captions
         // fits a 10-foot layout instead of four oversized posters.
         val posterWidth = if (isTv) {
             ((maxWidth - gutter * 2 - itemSpacing * (TV_POSTER_COLUMNS - 1)) / TV_POSTER_COLUMNS.toFloat())
@@ -220,17 +219,19 @@ fun HomeScreen(
         // The restored LazyColumn can take a few frames to lay out, so retry until a visible
         // target accepts focus instead of giving up on the first attempt.
         suspend fun restoreContentFocus() {
-            repeat(10) {
+            repeat(12) {
                 delay(100)
                 if (currentHeroFocused || currentRowFocused != null) return
-                val focused = if (currentHeroVisible) {
-                    runCatching { heroFocus.requestFocus() }.isSuccess
+                if (currentHeroVisible) {
+                    runCatching { heroFocus.requestFocus() }
                 } else {
-                    // The list itself is the stable entry target when the hero is scrolled away;
-                    // its focus handler forwards to a visible card.
-                    runCatching { listEntryFocus.requestFocus() }.isSuccess
+                    // Use this screen's own row requester, not the shell's shared one: the shared
+                    // requester can still point at a node from the screen we just left.
+                    val key = fullyVisibleRowKey() ?: entryRowKey ?: visibleRowKeys.firstOrNull()
+                    if (key != null) {
+                        runCatching { rowFocus.getValue(key).requestFocus() }
+                    }
                 }
-                if (focused) return
             }
         }
         LaunchedEffect(state.isLoading, state.hero?.id) {
@@ -258,19 +259,29 @@ fun HomeScreen(
         fun rowItemIndex(key: String): Int =
             1 + heroItemOffset + sectionKeys.indexOf(key)
 
-        fun focusRow(key: String) {
+        // Focus requests issued from inside onFocusChanged are dropped by the focus system, and a
+        // request can also land before the target row has been placed. Verify that the card really
+        // took focus and retry instead of trusting requestFocus().
+        suspend fun focusRowAndVerify(key: String): Boolean {
             val index = rowItemIndex(key)
-            if (index < 0) return
-            scope.launch {
-                // Prefer focus-driven bring-into-view: it scrolls just enough to reveal the card.
-                // Only fall back to a row scroll when the target row was outside the composed window.
-                val moved = runCatching { rowFocus.getValue(key).requestFocus() }.isSuccess
-                if (!moved) {
-                    runCatching { listState.animateScrollToItem(index) }
-                    kotlinx.coroutines.delay(150)
-                    runCatching { rowFocus.getValue(key).requestFocus() }
-                }
+            if (index < 0) return false
+            runCatching { rowFocus.getValue(key).requestFocus() }
+            withFrameNanos { }
+            withFrameNanos { }
+            if (focusedRowKey == key) return true
+            // The row may be outside the composed window; bring it in, then try once more.
+            if (entryRowKey != key) {
+                runCatching { listState.animateScrollToItem(index) }
+                delay(120)
+                runCatching { rowFocus.getValue(key).requestFocus() }
+                withFrameNanos { }
+                withFrameNanos { }
             }
+            return focusedRowKey == key
+        }
+
+        fun focusRow(key: String) {
+            scope.launch { focusRowAndVerify(key) }
         }
 
         fun focusHero() {
@@ -294,31 +305,6 @@ fun HomeScreen(
         fun moveDown(key: String) {
             val index = visibleRowKeys.indexOf(key)
             visibleRowKeys.getOrNull(index + 1)?.let(::focusRow)
-        }
-
-        // Stable focus anchor for the shell's Down/entry requests. Cards are lazy and the hero
-        // can be scrolled away, so this 1 dp box is the only target that always exists; it hands
-        // focus straight to a visible card.
-        if (isTv && !heroVisible) {
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .size(1.dp)
-                    .focusRequester(listEntryFocus)
-                    .onFocusChanged { focusState ->
-                        if (!focusState.isFocused) return@onFocusChanged
-                        scope.launch {
-                            val visibleKey = fullyVisibleRowKey()
-                            val key = visibleKey ?: entryRowKey ?: visibleRowKeys.firstOrNull()
-                                ?: return@launch
-                            if (visibleKey == null) {
-                                val index = rowItemIndex(key)
-                                if (index >= 0) runCatching { listState.animateScrollToItem(index) }
-                            }
-                            focusRow(key)
-                        }
-                    }
-                    .focusable(),
-            )
         }
 
         LazyColumn(
@@ -434,6 +420,7 @@ fun HomeScreen(
                             key = { it.contentId + it.episodeId.orEmpty() },
                             gutter = gutter,
                             firstItemFocusRequester = rowFocus.getValue("continue"),
+                            entryFocusRequester = if (entryRowKey == "continue") listEntryFocus else null,
                         ) { progress, modifier ->
                             SunsetLandscapeCard(
                                 title = progress.title,
@@ -471,6 +458,7 @@ fun HomeScreen(
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenLive,
                             firstItemFocusRequester = rowFocus.getValue("live"),
+                            entryFocusRequester = if (entryRowKey == "live") listEntryFocus else null,
                         ) { channel, modifier ->
                             val nowNext = state.nowNext[channel.id]
                             SunsetChannelCard(
@@ -515,6 +503,7 @@ fun HomeScreen(
                             key = { item -> item.type.name + item.id },
                             gutter = gutter,
                             firstItemFocusRequester = rowFocus.getValue("because"),
+                            entryFocusRequester = if (entryRowKey == "because") listEntryFocus else null,
                         ) { item, modifier ->
                             SunsetPosterCard(
                                 title = item.title,
@@ -557,6 +546,7 @@ fun HomeScreen(
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenMovies,
                             firstItemFocusRequester = rowFocus.getValue("discovery"),
+                            entryFocusRequester = if (entryRowKey == "discovery") listEntryFocus else null,
                         ) { movie, modifier ->
                             MoviePoster(
                                 movie,
@@ -569,7 +559,7 @@ fun HomeScreen(
                 }
 
                 if (state.loadingCatalogue) {
-                    item(key = "recent-movies-skeleton") {
+                    item(key = "recentMovies-skeleton") {
                         SectionSkeleton(
                             title = stringResource(R.string.home_row_recent_movies),
                             gutter = gutter,
@@ -578,7 +568,7 @@ fun HomeScreen(
                         )
                     }
                 } else if (state.recentMovies.isNotEmpty()) {
-                    item(key = "recent-movies") {
+                    item(key = "recentMovies") {
                         SunsetContentRow(
                             title = stringResource(R.string.home_row_recent_movies),
                             items = state.recentMovies,
@@ -587,6 +577,7 @@ fun HomeScreen(
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenMovies,
                             firstItemFocusRequester = rowFocus.getValue("recentMovies"),
+                            entryFocusRequester = if (entryRowKey == "recentMovies") listEntryFocus else null,
                         ) { movie, modifier ->
                             MoviePoster(
                                 movie,
@@ -599,7 +590,7 @@ fun HomeScreen(
                 }
 
                 if (state.loadingCatalogue) {
-                    item(key = "recent-series-skeleton") {
+                    item(key = "recentSeries-skeleton") {
                         SectionSkeleton(
                             title = stringResource(R.string.home_row_recent_series),
                             gutter = gutter,
@@ -608,7 +599,7 @@ fun HomeScreen(
                         )
                     }
                 } else if (state.recentSeries.isNotEmpty()) {
-                    item(key = "recent-series") {
+                    item(key = "recentSeries") {
                         SunsetContentRow(
                             title = stringResource(R.string.home_row_recent_series),
                             items = state.recentSeries,
@@ -617,6 +608,7 @@ fun HomeScreen(
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenSeries,
                             firstItemFocusRequester = rowFocus.getValue("recentSeries"),
+                            entryFocusRequester = if (entryRowKey == "recentSeries") listEntryFocus else null,
                         ) { series, modifier ->
                             SeriesPoster(
                                 series,
@@ -638,6 +630,7 @@ fun HomeScreen(
                             seeAllLabel = stringResource(R.string.action_see_all),
                             onSeeAll = onOpenMyList,
                             firstItemFocusRequester = rowFocus.getValue("saved"),
+                            entryFocusRequester = if (entryRowKey == "saved") listEntryFocus else null,
                         ) { card, modifier ->
                             SunsetPosterCard(
                                 title = card.title,

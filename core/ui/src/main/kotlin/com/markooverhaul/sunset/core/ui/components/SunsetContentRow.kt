@@ -35,6 +35,8 @@ fun <T> SunsetContentRow(
     gutter: Dp = 16.dp,
     itemSpacing: Dp = 16.dp,
     firstItemFocusRequester: FocusRequester? = null,
+    /** Additional requester for the same card, used by the shell's "enter content" Down key. */
+    entryFocusRequester: FocusRequester? = null,
     content: @Composable (T, Modifier) -> Unit,
 ) {
     if (items.isEmpty()) return
@@ -65,11 +67,15 @@ fun <T> SunsetContentRow(
             ),
         ) {
             itemsIndexed(items = items, key = { _, item -> key(item) }) { index, item ->
-                val itemModifier = if (
-                    index == firstVisibleIndex &&
-                    firstItemFocusRequester != null
-                ) {
-                    Modifier.focusRequester(firstItemFocusRequester)
+                val itemModifier = if (index == firstVisibleIndex) {
+                    var focusModifier: Modifier = Modifier
+                    if (firstItemFocusRequester != null) {
+                        focusModifier = focusModifier.focusRequester(firstItemFocusRequester)
+                    }
+                    if (entryFocusRequester != null) {
+                        focusModifier = focusModifier.focusRequester(entryFocusRequester)
+                    }
+                    focusModifier
                 } else {
                     Modifier
                 }
