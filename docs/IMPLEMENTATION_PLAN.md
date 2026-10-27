@@ -723,6 +723,33 @@ Play ring and Down walks the rails; tap-driven (touch mode) Back restores a visi
 Down moves to the next rail. `:app:assembleDebug testDebugUnitTest :app:lintDebug` passes with
 lint errors = 0.
 
+### 5.33 Every top-level screen must bind `LocalContentEntryFocus` (2026-10-27)
+
+Symptom: More and Search behaved like the earlier Home bug — the nav bar's Down key did nothing, so
+the remote felt dead on those two screens.
+
+Cause: `MainShell` owns one shared `FocusRequester` (`contentEntryFocus`) and publishes it through
+`LocalContentEntryFocus`. Its Down handler on the top navigation bar calls `requestFocus()` on that
+requester. When a screen never attaches the requester to a node, the request does not throw in this
+Compose version — it simply does nothing — so the key is consumed with nowhere to go. Home, Live,
+Movies, Series, PPV and My List bound it; More and Search were the only top-level routes that did
+not.
+
+- `MoreScreen` attaches the requester to the first row (Guide) via a new `modifier` parameter on
+  `MoreRow`.
+- `SearchScreen` attaches it to the search launcher box, or to the text field while the viewer is
+  editing. Both are already focus stops on TV, so no extra node was added.
+- Rule for new screens: any route in `LargeTopLevel` / `PhoneTopLevel` must read
+  `LocalContentEntryFocus.current` and put `Modifier.focusRequester(entryFocus)` on the control the
+  viewer should land on first. An unbound requester is invisible in code review and only shows up as
+  a dead Down key on the device.
+
+Verification on Fire TV (1920x1080, density 320): More lands on Guide with a ring, Down moves to
+PPV, Back from Guide returns with Guide focused. Search lands in the search box with a ring, Up to
+the nav then Down returns to the box, and a `verity` search focuses the first result; Up from the
+results lands on the filter row and Down returns to the first result.
+`:app:assembleDebug testDebugUnitTest :app:lintDebug` passes with lint errors = 0.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
