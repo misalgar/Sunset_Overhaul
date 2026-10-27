@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.ui.R
+import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.SunsetSectionCard
 
@@ -48,6 +50,9 @@ fun MoreScreen(
 ) {
     val isTv = LocalIsTelevision.current
     val gutter = if (isTv) 48.dp else 16.dp
+    // The nav bar's Down key focuses this. Without a bound target the key is consumed and dropped,
+    // which is what made More feel like a dead screen on the remote.
+    val entryFocus = LocalContentEntryFocus.current
 
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
@@ -72,6 +77,11 @@ fun MoreScreen(
                             icon = Icons.Rounded.DateRange,
                             title = stringResource(R.string.nav_guide),
                             onClick = onOpenGuide,
+                            modifier = if (entryFocus != null) {
+                                Modifier.focusRequester(entryFocus)
+                            } else {
+                                Modifier
+                            },
                         )
                         MoreRow(
                             icon = Icons.Rounded.PlayArrow,
@@ -105,10 +115,11 @@ private fun MoreRow(
     icon: ImageVector,
     title: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     SunsetFocusable(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(SunsetRadius.Sm),
         scaleOnFocus = false,
     ) {

@@ -57,6 +57,7 @@ import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.model.variantLabel
 import com.markooverhaul.sunset.core.ui.R
+import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.core.ui.components.SunsetChannelRow
 import com.markooverhaul.sunset.core.ui.components.SunsetContentRow
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
@@ -125,6 +126,8 @@ fun SearchScreen(
     val fieldFocusRequester = remember { FocusRequester() }
     val launcherFocusRequester = remember { FocusRequester() }
     val resultsFocusRequester = remember { FocusRequester() }
+    // The nav bar's Down key focuses this; without it the key is consumed and nothing happens.
+    val entryFocus = LocalContentEntryFocus.current
     val launcherInteraction = remember { MutableInteractionSource() }
     var pendingResultsFocus by remember { mutableStateOf(false) }
     var didInitialFocus by remember { mutableStateOf(false) }
@@ -297,6 +300,13 @@ fun SearchScreen(
                             if (isTv) {
                                 Modifier
                                     .focusRequester(launcherFocusRequester)
+                                    .then(
+                                        if (!editing && entryFocus != null) {
+                                            Modifier.focusRequester(entryFocus)
+                                        } else {
+                                            Modifier
+                                        },
+                                    )
                                     .onFocusChanged {
                                         launcherFocused = it.isFocused
                                         // If the IME (or the system Back) drops the box before the
@@ -363,6 +373,13 @@ fun SearchScreen(
                             if (isTv) {
                                 Modifier
                                     .focusRequester(fieldFocusRequester)
+                                    .then(
+                                        if (editing && entryFocus != null) {
+                                            Modifier.focusRequester(entryFocus)
+                                        } else {
+                                            Modifier
+                                        },
+                                    )
                                     // Not focusable until the viewer opts into editing, so D-pad
                                     // traversal never triggers the IME.
                                     .focusProperties { canFocus = editing }
