@@ -773,6 +773,33 @@ to the box; Select on the X empties the field, hides the X and leaves the box fo
 searches showing; Down from the X focuses the first result. The phone path still uses the built-in
 trailing icon.
 
+### 5.35 The login keyboard must stay closed after Back (2026-10-27)
+
+Symptom: on the login page, Select opened the keyboard on a field, Back closed it, but navigating
+back down to that field re-opened the keyboard without another Select — so the only way out was the
+IME's Next key.
+
+Cause: the Fire TV IME consumes Back itself. The app's `BackHandler` never fires, and the floating
+IME window reports no IME insets (`WindowInsets.isImeVisible` never becomes true), so the screen
+never learned the keyboard had closed and kept `editingField` set. The field therefore stayed
+editable, and an editable text field asks for the IME as soon as it regains focus.
+
+- `LoginScreen` now tracks `focusedField` through `onFocusChanged` on each input.
+- When an edited field loses focus and has not regained it after 400 ms, the keyboard was dismissed:
+  `stopEditing()` runs, the effect waits two frames so the field recomposes as read-only (focusing a
+  still-editable field is itself a keyboard-show request), and then focus is restored to that field
+  with the same `requestFocusFromTouch()` + retry pattern the shell uses. The 400 ms wait also lets
+  a legitimate IME Next/Previous move between fields settle first.
+- The form's focus order now skips stops that cannot take focus (the Sign in button while the form
+  is incomplete, the demo link while submitting). Before, Up from the demo link dead-ended on the
+  disabled Sign in button and the D-pad looked broken.
+
+Verification on Fire TV (1920x1080, density 320): Select opens the IME on Server; Back closes it and
+the ring stays on Server; Down and Up return to Server without the IME; Select re-opens it; IME Next
+moves to Username with the keyboard still open; Back there also leaves the ring on Username. With the
+form incomplete, Down from Need help reaches the demo link and Up from it returns to Need help, both
+skipping the disabled Sign in button.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

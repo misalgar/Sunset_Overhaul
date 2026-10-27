@@ -34,11 +34,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -47,6 +49,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -120,6 +123,11 @@ fun LoginScreen(
     // TV: the fields are plain focus stops, so moving up/down never opens the keyboard. The IME
     // only appears after an explicit Select on the focused field, and Back closes it again.
     var editingField by remember { mutableStateOf<LoginField?>(null) }
+    // Which field actually holds Compose focus. The platform drops Compose focus when the TV
+    // keyboard closes, and on this device that is the only reliable "Back was pressed" signal:
+    // the Fire TV IME consumes Back and never reports IME insets.
+    var focusedField by remember { mutableStateOf<LoginField?>(null) }
+    val view = LocalView.current
 
     // A text field swallows the arrow keys for the caret, so the form has its own focus order.
     val focusOrder = remember {
@@ -151,27 +159,44 @@ fun LoginScreen(
         keyboardController?.hide()
     }
 
-    /** Moves focus one step up or down the form. */
-    fun moveFocus(current: FocusRequester, delta: Int) {
-        val index = focusOrder.indexOf(current)
-        if (index < 0) return
-        val next = focusOrder.getOrNull(index + delta) ?: return
-        runCatching { next.requestFocus() }
+    fun isFocusStopEnabled(stop: FocusRequester): Boolean = when (stop) {
+        signInFocus -> state.canSubmit
+        demoFocus -> !state.isSubmitting
+        else -> true
     }
 
-    // Up/Down walk the form; while the keyboard is open the caret needs those keys.
+    /** Moves focus one step up or down the form, skipping stops that cannot take focus. */
+    fun moveFocus(current: FocusRequester, delta: Int) {
+        var index = focusOrder.indexOf(current)
+        if (index < 0) return
+        while (true) {
+            index += delta
+            val next = focusOrder.getOrNull(index) ?: return
+            // A disabled button is not a focus stop; without this Up from the demo link dead-ends
+            // on the disabled Sign in button and the D-pad looks broken.
+            if (!isFocusStopEnabled(next)) continue
+            runCatching { next.requestFocus() }
+            return
+        }
+    }
+
+    // On a TV the system IME consumes Back before the app sees it, and it does not report IME
+    // insets, so there is no "keyboard closed" callback. Up/Down are the signal: while the keyboard
+    // is open it owns the D-pad, so an arrow that reaches the form means the keyboard is closed.
+    // Leaving edit mode here is what stops the field from re-opening the keyboard on the way back.
     fun tvFocusNav(current: FocusRequester): Modifier = Modifier
         .onPreviewKeyEvent { event ->
             if (!isTv) return@onPreviewKeyEvent false
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            if (editingField != null) return@onPreviewKeyEvent false
             when (event.key) {
                 Key.DirectionDown -> {
+                    stopEditing()
                     moveFocus(current, 1)
                     true
                 }
 
                 Key.DirectionUp -> {
+                    stopEditing()
                     moveFocus(current, -1)
                     true
                 }
@@ -183,6 +208,15 @@ fun LoginScreen(
     // TV: Select (or a tap) on a focused field is the only thing that opens the keyboard.
     fun tvFieldModifier(field: LoginField): Modifier = Modifier
         .then(tvFocusNav(focusRequesterFor(field)))
+        .onFocusChanged { focusState ->
+            // Order-independent: the outgoing field may report "lost" before or after the incoming
+            // field reports "gained", so never clear a field that is not the current one.
+            if (focusState.isFocused) {
+                focusedField = field
+            } else if (focusedField == field) {
+                focusedField = null
+            }
+        }
         .onPreviewKeyEvent { event ->
             if (!isTv) return@onPreviewKeyEvent false
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -209,6 +243,37 @@ fun LoginScreen(
         delay(60)
         runCatching { focusRequesterFor(field).requestFocus() }
         keyboardController?.show()
+    }
+
+    // The Fire TV IME swallows Back and reports no IME insets, so "the keyboard closed" has no
+    // callback. Closing it does drop Compose focus, though, so an edited field that loses focus
+    // means the viewer dismissed the keyboard: leave edit mode and put the ring back on the field.
+    // Without this the field stayed editable and the IME re-opened as soon as focus returned to it.
+    // Keyed on focus only: keying on `editingField` would cancel this effect the moment
+    // `stopEditing()` clears it, and the focus restore below would never run.
+    LaunchedEffect(focusedField) {
+        val editing = editingField ?: return@LaunchedEffect
+        if (!isTv || focusedField == editing) return@LaunchedEffect
+        // IME Next/Previous re-requests focus on the new field within a frame or two, so a
+        // mismatch that is still there after this wait is a dismissal, not a field change. (The
+        // platform can restore focus to any other field, not just to "nothing", so field identity
+        // cannot be used to tell the two apart.)
+        delay(400)
+        if (editingField != editing || focusedField == editing) return@LaunchedEffect
+        stopEditing()
+        // Let the field recompose as read-only before it takes focus: focusing a still-editable
+        // field is itself a keyboard-show request, which would undo the dismissal we just handled.
+        withFrameNanos { }
+        withFrameNanos { }
+        keyboardController?.hide()
+        // The platform also loses the Compose focus target with the keyboard, so keep asking until
+        // the field takes it back; a single request can be dropped while the IME window closes.
+        repeat(10) {
+            if (isTv && !view.isFocused) runCatching { view.requestFocusFromTouch() }
+            runCatching { focusRequesterFor(editing).requestFocus() }
+            delay(60)
+            if (focusedField == editing) return@LaunchedEffect
+        }
     }
 
     // Back closes the keyboard but keeps focus on the field, so the remote still works.
