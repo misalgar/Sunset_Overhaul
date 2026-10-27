@@ -146,8 +146,7 @@ unverified and follow the setup steps there.
 
 ## Package naming decision
 
-The implementation uses `com.markooverhaul.sunset.v2` as instructed for this overhaul. The design
-spec appendix refers to `com.nathnetwork.sunset.v2`. Confirm the final application id before any
+The implementation uses `com.markooverhaul.sunset.v2` as instructed for this overhaul. Confirm the final application id before any
 store or provider release; changing it later also changes the deep-link authority and signing
 identity.
 
