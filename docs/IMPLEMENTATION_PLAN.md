@@ -692,23 +692,36 @@ preview, progress and "13 min left", and four complete channel rows above the fo
 
 ### 5.32 Fix dead D-pad on Home after Live TV (2026-10-27)
 
-Symptom: after visiting Live TV and going Back, Home could ignore the D-pad. The nav's Down
-handler focuses `LocalContentEntryFocus`, but Home only attached that requester to the hero Play
-button. When Home was scrolled past the hero, that button was not composed, so the requester was
-unbound and `requestFocus()` failed silently. The restored LazyColumn also had no focus target of
-its own, so the first key press could be swallowed or just focus the nav.
+Symptom: after visiting Live TV and going Back, Home could ignore the D-pad. Three causes stacked
+up, and each one alone was enough to fake a working fix:
 
-- Home now attaches the entry requester to the hero when it is visible, otherwise to a stable 1 dp
-  focus anchor that forwards focus to the first visible rail's first visible card.
-- `MainShell` re-requests the entry focus whenever a top-level route becomes current (Back from
-  Live, nav taps) and retries for up to a second while the restored list lays out.
-- Down while the hero is focused now explicitly moves to the first rail instead of relying on
-  geometric focus search.
-- Home's load-time restore effect uses the same hero/anchor targets.
+1. **The entry requester was never bound to the rails.** The `Recently added in Movies/Series`
+   LazyColumn items used the keys `recent-movies` / `recent-series`, while the focus logic
+   (`visibleRowKeys`, `sectionKeys`, `entryRowKey`, `fullyVisibleRowKey()`) used
+   `recentMovies` / `recentSeries`. With the hero scrolled away, nothing matched, so the shell's
+   requester was attached to no card. The two rails are now keyed consistently.
+2. **`requestFocus()` success was trusted.** Compose reports success for a request aimed at a
+   stale or not-yet-placed node, so the early-exit loops stopped while focus still sat on the nav
+   chip. Focus moves are now verified (`focusedRowKey`) after two frames and retried.
+3. **Touch mode left the window without a focused Android view.** After `adb input tap` (or any
+   touch on a hybrid remote) the window stayed in touch mode, `root.findFocus()` was `null`, and
+   Compose silently ignored focus requests until a key press. `requestFocusFromTouch()` restores
+   view focus so the requests land.
 
-Tests/verification note: the anchor was observed receiving the shell focus on return. The final
-on-device confirmation was interrupted by Fire TV's "Low on Storage Space" system dialog (which
-takes focus away from the app), so a clean re-test is still worth doing after freeing space.
+- Home attaches the shell's requester directly to the first card of the first visible rail (and to
+  the hero Play button while the hero is on screen). The old 1 dp anchor and its hand-off are gone:
+  a node cannot move focus while it holds focus, so the hand-off was unreliable by construction.
+- `SunsetContentRow` takes an extra `entryFocusRequester`, so one card can serve both row
+  navigation and the nav bar's Down key.
+- `MainShell` resets its focus flag, re-focuses the Compose view, and re-requests the entry target
+  on every top-level route change until the content really holds focus (12 attempts).
+- Home's load-time restore effect retries with its own row requesters rather than the shell's
+  shared one, which can still point at a node from the screen just left.
+
+Verification on Fire TV (1920x1080, density 320): remote-only Back from Live restores the hero
+Play ring and Down walks the rails; tap-driven (touch mode) Back restores a visible card ring and
+Down moves to the next rail. `:app:assembleDebug testDebugUnitTest :app:lintDebug` passes with
+lint errors = 0.
 
 ## 6. Verification
 
