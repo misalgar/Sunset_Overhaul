@@ -123,6 +123,8 @@
     <string name="live_open_guide">Abrir guía TV</string>
     <string name="live_guide_hint">Pulsa ◀ para las categorías</string>
     <string name="live_starts_at">Empieza %1$s</string>
+    <string name="live_started_at">En vivo • Inició %1$s</string>
+    <string name="live_programme_started_at">%1$s • Inició %2$s</string>
     <string name="live_hero_hint">Explora los canales para ver qué hay ahora.</string>
     <string name="live_hero_watch_hint">Pulsa OK para verlo a pantalla completa</string>
     <string name="live_hero_categories_hint">◀ Categorías</string>

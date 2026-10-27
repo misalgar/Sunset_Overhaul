@@ -1,7 +1,11 @@
 package com.markooverhaul.sunset.feature.live
 
+import com.markooverhaul.sunset.core.model.EpgProgramme
+import com.markooverhaul.sunset.core.model.LIVE_EVENT_START_GRACE_MS
 import com.markooverhaul.sunset.core.model.LiveChannel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LiveUiStateTest {
@@ -62,5 +66,70 @@ class LiveUiStateTest {
         assertEquals(2, state.allChannelCount)
         assertEquals(1, state.favouriteChannelCount)
         assertEquals(1, state.adultChannelCount)
+    }
+
+    private fun eventChannel(startUtcMs: Long) = LiveChannel(
+        id = "event",
+        name = "Fleetwood Town vs Arsenal",
+        number = 99,
+        scheduledStartUtcMs = startUtcMs,
+    )
+
+    @Test
+    fun `a past event is live and keeps its start time`() {
+        val start = 1_000_000L
+        val status = channelStatus(
+            eventChannel(start),
+            programme = null,
+            nowMs = start + 60_000L,
+        )
+        assertTrue(status is ChannelStatus.Live)
+        status as ChannelStatus.Live
+        assertEquals(start, status.startedAtEpochMillis)
+        assertNull(status.programmeTitle)
+    }
+
+    @Test
+    fun `a future event stays upcoming until the start grace runs out`() {
+        val start = 1_000_000L
+        assertEquals(
+            ChannelStatus.Upcoming(start),
+            channelStatus(eventChannel(start), null, start - LIVE_EVENT_START_GRACE_MS - 1),
+        )
+        val live = channelStatus(eventChannel(start), null, start - LIVE_EVENT_START_GRACE_MS)
+        assertTrue(live is ChannelStatus.Live)
+        assertEquals(start, (live as ChannelStatus.Live).startedAtEpochMillis)
+    }
+
+    @Test
+    fun `a 24-7 channel uses the current programme start and progress`() {
+        val now = 5_000_000L
+        val programme = EpgProgramme(
+            id = "p1",
+            channelId = "1",
+            title = "News",
+            startUtcMs = now - 15 * 60_000L,
+            endUtcMs = now + 45 * 60_000L,
+        )
+        val status = channelStatus(channel("1", "sports"), programme, now)
+        assertTrue(status is ChannelStatus.Live)
+        status as ChannelStatus.Live
+        assertEquals("News", status.programmeTitle)
+        assertEquals(programme.startUtcMs, status.startedAtEpochMillis)
+        assertEquals(0.25f, status.progress!!, 0.0001f)
+    }
+
+    @Test
+    fun `a programme that has not started is not used as the live start`() {
+        val now = 5_000_000L
+        val programme = EpgProgramme(
+            id = "p1",
+            channelId = "1",
+            title = "Later",
+            startUtcMs = now + 60_000L,
+            endUtcMs = now + 120_000L,
+        )
+        val status = channelStatus(channel("1", "sports"), programme, now) as ChannelStatus.Live
+        assertNull(status.startedAtEpochMillis)
     }
 }

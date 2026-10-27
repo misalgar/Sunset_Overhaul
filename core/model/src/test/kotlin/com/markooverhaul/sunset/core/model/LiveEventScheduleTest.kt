@@ -3,7 +3,9 @@ package com.markooverhaul.sunset.core.model
 import java.util.Calendar
 import java.util.TimeZone
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LiveEventScheduleTest {
@@ -132,5 +134,19 @@ class LiveEventScheduleTest {
         // 21:10 in Mexico City (UTC-6) is 03:10 UTC the next day.
         val expectedUtc = panelTime(2026, 10, 26, 3, 10, TimeZone.getTimeZone("UTC"))
         assertEquals(expectedUtc, schedule?.startsAtUtcMs)
+    }
+
+    @Test
+    fun `upcoming applies the panel start grace`() {
+        val start = 1_000_000L
+        val schedule = LiveEventSchedule(startsAtUtcMs = start, displayName = "Match")
+        assertTrue(schedule.isUpcoming(start - LIVE_EVENT_START_GRACE_MS - 1))
+        assertFalse(schedule.isUpcoming(start - LIVE_EVENT_START_GRACE_MS))
+        assertFalse(schedule.isUpcoming(start))
+    }
+
+    @Test
+    fun `a channel without a parsed schedule is never upcoming`() {
+        assertFalse(isUpcomingEvent(null, 0L))
     }
 }

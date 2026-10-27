@@ -41,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -534,20 +535,24 @@ private fun LiveWideContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
+                        .clipToBounds()
                         .onFocusChanged {
                             isGridFocused = it.hasFocus
                             if (!it.hasFocus) onClearFocus()
                         },
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = SunsetSpacing.Xl),
+                    contentPadding = PaddingValues(
+                        top = 4.dp,
+                        bottom = SunsetSpacing.Xl,
+                    ),
                 ) {
                     itemsIndexed(
                         items = state.visibleChannels,
                         key = { _, channel -> channel.id },
                     ) { index, channel ->
                         val programme = state.programmes[channel.id]?.now
-                        val status = rememberChannelStatus(channel, programme, nowMs)
+                        val status = channelStatus(channel, programme, nowMs)
                         SunsetLiveChannelTile(
                             channel = channel,
                             nowTitle = programme?.title,
@@ -556,8 +561,11 @@ private fun LiveWideContent(
                             unfavouriteLabel = stringResource(R.string.live_unfavourite),
                             onPlay = { onPlayChannel(channel) },
                             onToggleFavourite = { onToggleFavourite(channel) },
-                            progress = status.progress,
-                            startsAtLabel = status.startsAtLabel,
+                            progress = (status as? ChannelStatus.Live)?.progress,
+                            startsAtEpochMillis =
+                                (status as? ChannelStatus.Upcoming)?.startsAtEpochMillis,
+                            startedAtEpochMillis =
+                                (status as? ChannelStatus.Live)?.startedAtEpochMillis,
                             onFocusChanged = { isFocused ->
                                 if (isFocused) onChannelFocused(channel)
                             },

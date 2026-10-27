@@ -182,7 +182,7 @@ fun PpvScreen(
             ) {
                 items(state.visibleChannels, key = { it.id }) { channel ->
                     val programme = state.programmes[channel.id]?.now
-                    val status = rememberChannelStatus(channel, programme, nowMs)
+                    val status = channelStatus(channel, programme, nowMs)
                     SunsetLiveChannelTile(
                         channel = channel,
                         nowTitle = programme?.title,
@@ -191,8 +191,11 @@ fun PpvScreen(
                         unfavouriteLabel = stringResource(R.string.live_unfavourite),
                         onPlay = { onPlayChannel(channel) },
                         onToggleFavourite = { onToggleFavourite(channel) },
-                        progress = status.progress,
-                        startsAtLabel = status.startsAtLabel,
+                        progress = (status as? ChannelStatus.Live)?.progress,
+                        startsAtEpochMillis =
+                            (status as? ChannelStatus.Upcoming)?.startsAtEpochMillis,
+                        startedAtEpochMillis =
+                            (status as? ChannelStatus.Live)?.startedAtEpochMillis,
                     )
                 }
             }

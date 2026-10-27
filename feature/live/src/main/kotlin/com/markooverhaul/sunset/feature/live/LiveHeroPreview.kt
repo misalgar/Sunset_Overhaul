@@ -141,11 +141,11 @@ fun SunsetHeroPreviewHeader(
                         Text(
                             text = focusedChannel.name,
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontSize = 22.sp,
+                                fontSize = if (focusedChannel.name.length > 20) 18.sp else 22.sp,
                                 fontWeight = FontWeight.Bold,
                             ),
                             color = SunsetColors.TextPrimary,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         val timeRange = now?.let {
@@ -177,11 +177,25 @@ fun SunsetHeroPreviewHeader(
                                 }
                             }
                         } else {
+                            // Event and PPV feeds have no EPG title, so surface their own start.
+                            val status = channelStatus(focusedChannel, now, nowMs)
                             Text(
-                                text = stringResource(R.string.live_status_live),
+                                text = when (status) {
+                                    is ChannelStatus.Upcoming -> stringResource(
+                                        R.string.live_starts_at,
+                                        SunsetFormat.time(context, status.startsAtEpochMillis),
+                                    )
+                                    is ChannelStatus.Live -> status.startedAtEpochMillis?.let {
+                                        stringResource(
+                                            R.string.live_started_at,
+                                            SunsetFormat.time(context, it),
+                                        )
+                                    } ?: stringResource(R.string.live_status_live)
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = SunsetColors.TextSecondary,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 2.dp),
                             )
                         }

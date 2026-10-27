@@ -42,6 +42,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,6 +57,7 @@ import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
 import com.markooverhaul.sunset.core.model.LiveChannel
 import com.markooverhaul.sunset.core.ui.R
+import com.markooverhaul.sunset.core.ui.util.SunsetFormat
 
 /** On Now live card: logo, LIVE badge, channel name, current programme and progress. */
 @Composable
@@ -224,7 +226,8 @@ fun SunsetLiveChannelTile(
     onToggleFavourite: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
-    startsAtLabel: String? = null,
+    startsAtEpochMillis: Long? = null,
+    startedAtEpochMillis: Long? = null,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
     // A held Select arrives as repeated KeyDown events. The first repeat toggles the favourite and
@@ -317,7 +320,8 @@ fun SunsetLiveChannelTile(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        if (startsAtLabel != null) {
+                        val context = LocalContext.current
+                        if (startsAtEpochMillis != null) {
                             Icon(
                                 imageVector = Icons.Rounded.Schedule,
                                 contentDescription = null,
@@ -325,11 +329,15 @@ fun SunsetLiveChannelTile(
                                 modifier = Modifier.size(14.dp),
                             )
                             Text(
-                                text = startsAtLabel,
+                                text = stringResource(
+                                    R.string.live_starts_at,
+                                    SunsetFormat.time(context, startsAtEpochMillis),
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = SunsetColors.TextTertiary,
                                 maxLines = 1,
                                 softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         } else {
                             Box(
@@ -337,11 +345,24 @@ fun SunsetLiveChannelTile(
                                     .size(6.dp)
                                     .background(SunsetColors.SemanticLive, CircleShape),
                             )
+                            val title = nowTitle?.takeIf { it.isNotBlank() }
+                            val startedAt = startedAtEpochMillis?.let {
+                                SunsetFormat.time(context, it)
+                            }
                             Text(
-                                text = nowTitle?.takeIf { it.isNotBlank() }
-                                    ?: stringResource(R.string.live_status_live),
+                                text = when {
+                                    title != null && startedAt != null -> stringResource(
+                                        R.string.live_programme_started_at,
+                                        title,
+                                        startedAt,
+                                    )
+                                    title != null -> title
+                                    startedAt != null ->
+                                        stringResource(R.string.live_started_at, startedAt)
+                                    else -> stringResource(R.string.live_status_live)
+                                },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (nowTitle.isNullOrBlank()) {
+                                color = if (title == null) {
                                     SunsetColors.TextTertiary
                                 } else {
                                     SunsetColors.TextSecondary

@@ -800,6 +800,42 @@ moves to Username with the keyboard still open; Back there also leaves the ring 
 form incomplete, Down from Need help reaches the demo link and Up from it returns to Need help, both
 skipping the disabled Sign in button.
 
+### 5.36 Live events and PPV must show when they started (2026-10-27)
+
+Event feeds carry their start time in the channel name. `XtreamContentProvider` already parses it
+once at load time with `parseLiveEventSchedule(...)`, stores `LiveChannel.scheduledStartUtcMs`, and
+replaces the name with the clean matchup. The Live tile only kept the parsed time while the event
+was upcoming, so once it began the status dropped to `Live` and the start time was lost.
+
+- `core/model` now owns the grace rule: `isUpcomingEvent(startUtcMs, nowUtcMs)` and
+  `LiveEventSchedule.isUpcoming(nowUtcMs)` both compare against `LIVE_EVENT_START_GRACE_MS`
+  (10 minutes). The parser and the UI share one definition instead of repeating the arithmetic.
+- `ChannelStatus` is a sealed interface. `Upcoming(startsAtEpochMillis)` is returned while the
+  grace has not run out; `Live(programmeTitle, startedAtEpochMillis, progress)` keeps the event
+  start after kick-off, falling back to the current EPG programme's start when the channel has no
+  parsed event. `channelStatus(...)` is a pure function so it is testable without Compose.
+- `SunsetLiveChannelTile` receives `startsAtEpochMillis` / `startedAtEpochMillis` rather than a
+  pre-formatted label. The tile formats the clock with `SunsetFormat.time(context, ...)` itself,
+  which keeps `core/ui` independent of `feature/live`.
+- Status text uses the new `live_started_at` (`Live • Started %1$s` / `En vivo • Inició %1$s`) and
+  `live_programme_started_at` (`%1$s • Started %2$s` / `%1$s • Inició %2$s`) strings. A 6 dp red
+  `SemanticLive` dot stays inline before the text, with one line and an ellipsis.
+- PPV uses the same tile and `channelStatus(...)`, so its events show the clean matchup plus
+  `Live • Started …` or `Starts …` without a second regex or any extra request.
+- `LiveHeroPreview` wraps the title to two lines and drops from 22 sp to 18 sp above 20 characters,
+  so matchups such as `Fleetwood Town vs Arsenal` no longer truncate. When the EPG has no title it
+  shows the event's own `Starts …` / `Live • Started …`.
+- The TV grid clips its top edge and adds 4 dp of top content padding, so a partially scrolled card
+  no longer draws over the hero's bottom border.
+
+Verification on Fire TV (1920x1080, density 320): Soccer • Martes tiles read `Live • Started
+6:15 a.m.`; a future event reads `Starts 4:00 p.m.`; the hero shows the full `Beijing Guoan vs
+Jeonbuk Motros` on two lines with `Live • Started 6:15 a.m.`; PPV shows both `Live • Started 3:00
+a.m.` and `Starts 8:00 p.m.`; a normal channel reads `Family Guy • Started 3:30 p.m.`. Unit tests
+cover a past event, the grace boundary, a 24/7 channel's EPG fallback and a programme that has not
+started. Full gate: `:app:assembleDebug testDebugUnitTest :app:lintDebug` passes with 0 lint errors
+and 19 warnings.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

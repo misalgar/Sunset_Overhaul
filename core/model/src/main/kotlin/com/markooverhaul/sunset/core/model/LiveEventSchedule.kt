@@ -18,6 +18,14 @@ data class LiveEventSchedule(
  */
 const val LIVE_EVENT_START_GRACE_MS = 10 * 60 * 1000L
 
+/** True while [startUtcMs] is still ahead of [nowUtcMs] once the panel's start grace is applied. */
+fun isUpcomingEvent(startUtcMs: Long?, nowUtcMs: Long): Boolean =
+    startUtcMs != null && nowUtcMs < startUtcMs - LIVE_EVENT_START_GRACE_MS
+
+/** True while this event's start is still ahead of [nowUtcMs] once the start grace is applied. */
+fun LiveEventSchedule.isUpcoming(nowUtcMs: Long): Boolean =
+    isUpcomingEvent(startsAtUtcMs, nowUtcMs)
+
 private val EventNameTime = Regex(
     """^\s*(\d{1,2})[:;](\d{2})\s*(?:([ap])\.?\s*m\.?)?\s*(?:[|·•:\-–—]\s*)?(.*)$""",
     RegexOption.IGNORE_CASE,
