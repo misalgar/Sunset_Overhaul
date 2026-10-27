@@ -63,7 +63,7 @@ fun SunsetHeroPreviewHeader(
     channelCount: Int,
     isGridFocused: Boolean,
     modifier: Modifier = Modifier,
-    height: Dp = 176.dp,
+    height: Dp = 156.dp,
 ) {
     val context = LocalContext.current
     val now = programme?.now
@@ -180,18 +180,7 @@ fun SunsetHeroPreviewHeader(
                             // Event and PPV feeds have no EPG title, so surface their own start.
                             val status = channelStatus(focusedChannel, now, nowMs)
                             Text(
-                                text = when (status) {
-                                    is ChannelStatus.Upcoming -> stringResource(
-                                        R.string.live_starts_at,
-                                        SunsetFormat.time(context, status.startsAtEpochMillis),
-                                    )
-                                    is ChannelStatus.Live -> status.startedAtEpochMillis?.let {
-                                        stringResource(
-                                            R.string.live_started_at,
-                                            SunsetFormat.time(context, it),
-                                        )
-                                    } ?: stringResource(R.string.live_status_live)
-                                },
+                                text = resolveHeroChannelStatusText(status),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = SunsetColors.TextSecondary,
                                 maxLines = 1,
@@ -203,19 +192,21 @@ fun SunsetHeroPreviewHeader(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            val description = now?.description?.takeIf { it.isNotBlank() }
+            if (description != null) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = now?.description?.takeIf { it.isNotBlank() }
-                    ?: stringResource(R.string.live_hero_watch_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = SunsetColors.TextTertiary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SunsetColors.TextTertiary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
-        // Edge-to-edge 16:9 preview: 176 dp tall, so ~313 dp wide with no outer padding.
+        // Edge-to-edge 16:9 preview: 156 dp tall, so ~277 dp wide with no outer padding.
         Box(
             modifier = Modifier
                 .fillMaxHeight()
@@ -253,7 +244,8 @@ fun SunsetHeroPreviewHeader(
                 }
             }
 
-            // Horizontal blend so the metadata card flows into the video, like Freeview/Netflix.
+            // Proportional blend so the metadata card flows into the video without a hard seam at
+            // a fixed pixel boundary.
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -261,9 +253,9 @@ fun SunsetHeroPreviewHeader(
                     .fillMaxHeight()
                     .background(
                         Brush.horizontalGradient(
-                            colors = listOf(HeroBackground, Color.Transparent),
-                            startX = 0f,
-                            endX = 80f,
+                            0.0f to HeroBackground,
+                            0.45f to HeroBackground.copy(alpha = 0.25f),
+                            1.0f to Color.Transparent,
                         ),
                     ),
             )

@@ -34,14 +34,39 @@ private val LiveSoccerCategory = Regex(
 )
 
 /**
+ * Sidebar rows are narrow, so weekday suffixes shrink to three letters: `Soccer • Mié` fits where
+ * `Soccer • Miércoles` truncated to `Soccer • Mier...`. Both provider spellings are covered.
+ */
+private val WeekdayAbbreviations = mapOf(
+    "lunes" to "Lun",
+    "martes" to "Mar",
+    "miercoles" to "Mié",
+    "miércoles" to "Mié",
+    "jueves" to "Jue",
+    "viernes" to "Vie",
+    "sabado" to "Sáb",
+    "sábado" to "Sáb",
+    "domingo" to "Dom",
+    "monday" to "Mon",
+    "tuesday" to "Tue",
+    "wednesday" to "Wed",
+    "thursday" to "Thu",
+    "friday" to "Fri",
+    "saturday" to "Sat",
+    "sunday" to "Sun",
+)
+
+/**
  * Category names read like panel data (`NFL 25/10/26`). The sidebar shows the friendly form
  * (`NFL • Oct 25`) while the raw name stays available for schedule parsing and PPV detection.
- * `Live Soccer Domingo` becomes `Soccer • Domingo` so it fits the sidebar on one line.
+ * `Live Soccer Domingo` becomes `Soccer • Dom` so it fits the sidebar on one line.
  */
 fun cleanCategoryDisplayName(raw: String): String {
     val months = java.text.DateFormatSymbols.getInstance().shortMonths
     val shortened = LiveSoccerCategory.replace(sanitizeProviderName(raw)) { match ->
-        "Soccer • ${match.groupValues[1].trim()}"
+        val day = match.groupValues[1].trim()
+        val abbreviation = WeekdayAbbreviations[day.lowercase(Locale.ROOT)] ?: day
+        "Soccer • $abbreviation"
     }
     return CategoryDate.replace(shortened) { match ->
         val day = match.groupValues[1].toIntOrNull()

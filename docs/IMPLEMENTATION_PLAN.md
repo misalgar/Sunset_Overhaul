@@ -836,6 +836,44 @@ cover a past event, the grace boundary, a 24/7 channel's EPG fallback and a prog
 started. Full gate: `:app:assembleDebug testDebugUnitTest :app:lintDebug` passes with 0 lint errors
 and 19 warnings.
 
+Section 5.37 supersedes the EPG-start fallback above: only event and PPV feeds keep a start time.
+
+### 5.37 Live TV declutter and event-only start times (2026-10-27)
+
+The 5.36 status rule was too broad: every 24/7 channel repeated its EPG programme start as
+`Family Guy • Started 3:30 p.m.`, which added noise on eight tiles at once. The visual pass also
+removed the remaining "box-in-a-box" chrome and gave titles their width back.
+
+- `channelStatus(...)` now sets `startedAtEpochMillis` only from `LiveChannel.scheduledStartUtcMs`.
+  Ordinary channels return `Live(programmeTitle, startedAtEpochMillis = null)`; the EPG programme
+  start is no longer copied into the tile status.
+- `LiveScreen` has two status helpers. `resolveCardChannelStatusText(...)` is the compact tile
+  subtitle (`Family Guy`, `Live • 6:15 a.m.`, `Starts 5:30 p.m.`) and
+  `resolveHeroChannelStatusText(...)` keeps the full `Live • Started 6:15 a.m.` wording for the hero.
+  New strings `live_programme_at` and `live_live_at` cover the compact forms; the unused
+  `live_programme_started_at` and `live_hero_watch_hint` resources are gone. PPV uses the same
+  helper, so its tiles read `Live • 2:00 a.m.` too.
+- The sidebar loses its rounded elevated background and border. It is `248.dp` wide with 4 dp of
+  vertical padding, so category rows sit directly on the page background.
+- Unfocused tiles use a transparent 1 dp border (only the focused tile keeps the Sunset yellow
+  ring). The favourite star renders only for favourites or the focused tile; otherwise the title
+  column takes the full card width.
+- The hero falls back to `focusedChannel ?: previewChannel ?: visibleChannels.firstOrNull()`, so
+  browsing categories always previews something. It is 156 dp tall, and the horizontal blend uses
+  proportional stops (`0.0f`, `0.45f`, `1.0f`) instead of an 80 px bound. The static
+  "Press OK to watch full screen" line is gone when the programme has no description.
+- `Live Soccer <day>` weekdays shorten to three letters (`Lun/Mar/Mié/Jue/Vie/Sáb/Dom` and
+  `Mon/Tue/Wed/Thu/Fri/Sat/Sun`), so `Soccer • Martes` no longer truncates to `Soccer • Mart...`.
+- The pane gap grows to `SunsetSpacing.Xl` (24 dp); the grid uses 12 dp horizontal and 10 dp
+  vertical spacing.
+
+Verification on Fire TV (192.168.4.26, 1920x1080, density 320): regular channels read `Live`,
+`Mega News`, `Juego de villanos` and `Family Guy` with no start time; Soccer • Mar reads `Live •
+6:15 a.m.` while its hero reads `Live • Started 6:15 a.m.`; NBA upcoming tiles read `Starts 5:30
+p.m.`; PPV reads `Live • 2:00 a.m.`; unfocused tiles have no border or star, the focused tile shows
+both; the hero previews the first channel while the sidebar is focused. Unit tests cover the
+event-only start rule. Full gate: `testDebugUnitTest :app:assembleDebug :app:lintDebug` passes.
+
 ## 6. Verification
 
 ### 6.1 Automated checks

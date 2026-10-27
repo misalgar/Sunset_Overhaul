@@ -102,7 +102,7 @@ class LiveUiStateTest {
     }
 
     @Test
-    fun `a 24-7 channel uses the current programme start and progress`() {
+    fun `a 24-7 channel shows its programme without an event start`() {
         val now = 5_000_000L
         val programme = EpgProgramme(
             id = "p1",
@@ -115,12 +115,13 @@ class LiveUiStateTest {
         assertTrue(status is ChannelStatus.Live)
         status as ChannelStatus.Live
         assertEquals("News", status.programmeTitle)
-        assertEquals(programme.startUtcMs, status.startedAtEpochMillis)
+        // Only event/PPV feeds publish a start; an EPG slot is not an event start.
+        assertNull(status.startedAtEpochMillis)
         assertEquals(0.25f, status.progress!!, 0.0001f)
     }
 
     @Test
-    fun `a programme that has not started is not used as the live start`() {
+    fun `a future programme does not invent an event start`() {
         val now = 5_000_000L
         val programme = EpgProgramme(
             id = "p1",

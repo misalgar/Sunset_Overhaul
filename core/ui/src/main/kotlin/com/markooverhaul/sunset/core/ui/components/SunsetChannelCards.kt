@@ -212,7 +212,8 @@ fun SunsetChannelRow(
  * Dense live tile for the 2-column TV grid. The card has a strict 64 dp height so four rows fit
  * above the fold, a 44 dp logo badge, a single-line title, and a status row with LIVE (or the
  * scheduled start) next to the current programme. Holding Select toggles the favourite without
- * adding a second focus stop.
+ * adding a second focus stop. The favourite star only appears for favourites or while the tile is
+ * focused, so unfocused rows give the channel name the full width.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -227,7 +228,7 @@ fun SunsetLiveChannelTile(
     modifier: Modifier = Modifier,
     progress: Float? = null,
     startsAtEpochMillis: Long? = null,
-    startedAtEpochMillis: Long? = null,
+    liveStatusText: String? = null,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
     // A held Select arrives as repeated KeyDown events. The first repeat toggles the favourite and
@@ -274,11 +275,7 @@ fun SunsetLiveChannelTile(
         scaleOnFocus = false,
     ) {
         val cardColor = if (focused) Color(0xFF202938) else Color(0xFF161C26)
-        val borderColor = if (focused) {
-            SunsetColors.FocusRing
-        } else {
-            Color.White.copy(alpha = 0.08f)
-        }
+        val borderColor = if (focused) SunsetColors.FocusRing else Color.Transparent
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -346,21 +343,9 @@ fun SunsetLiveChannelTile(
                                     .background(SunsetColors.SemanticLive, CircleShape),
                             )
                             val title = nowTitle?.takeIf { it.isNotBlank() }
-                            val startedAt = startedAtEpochMillis?.let {
-                                SunsetFormat.time(context, it)
-                            }
                             Text(
-                                text = when {
-                                    title != null && startedAt != null -> stringResource(
-                                        R.string.live_programme_started_at,
-                                        title,
-                                        startedAt,
-                                    )
-                                    title != null -> title
-                                    startedAt != null ->
-                                        stringResource(R.string.live_started_at, startedAt)
-                                    else -> stringResource(R.string.live_status_live)
-                                },
+                                text = liveStatusText
+                                    ?: stringResource(R.string.live_status_live),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (title == null) {
                                     SunsetColors.TextTertiary
@@ -373,12 +358,22 @@ fun SunsetLiveChannelTile(
                         }
                     }
                 }
-                Icon(
-                    imageVector = if (isFavourite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = if (isFavourite) unfavouriteLabel else favouriteLabel,
-                    tint = if (isFavourite) SunsetColors.AccentPrimary else SunsetColors.TextTertiary,
-                    modifier = Modifier.size(18.dp),
-                )
+                if (isFavourite || focused) {
+                    Icon(
+                        imageVector = if (isFavourite) {
+                            Icons.Filled.Star
+                        } else {
+                            Icons.Outlined.StarBorder
+                        },
+                        contentDescription = if (isFavourite) unfavouriteLabel else favouriteLabel,
+                        tint = if (isFavourite) {
+                            SunsetColors.AccentPrimary
+                        } else {
+                            SunsetColors.TextTertiary
+                        },
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
             if (progress != null) {
                 Box(

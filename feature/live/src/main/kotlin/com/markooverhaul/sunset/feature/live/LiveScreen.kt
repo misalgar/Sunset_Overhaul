@@ -89,7 +89,7 @@ import kotlinx.coroutines.launch
 
 /** Width from which the master-detail layout replaces the phone chip row. */
 private val WideLayoutMinWidth = 840.dp
-private val SidebarWidth = 240.dp
+private val SidebarWidth = 248.dp
 private const val CATEGORY_PREVIEW_DEBOUNCE_MS = 250L
 
 @Composable
@@ -421,20 +421,12 @@ private fun LiveWideContent(
             modifier = Modifier
                 .width(SidebarWidth)
                 .fillMaxHeight()
-                .padding(
-                    start = gutter,
-                    top = SunsetSpacing.Md,
-                    bottom = SunsetSpacing.Md,
-                ),
+                .padding(start = gutter),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        color = Color.White.copy(alpha = 0.03f),
-                        shape = RoundedCornerShape(SunsetRadius.Lg),
-                    )
-                    .padding(SunsetSpacing.Md),
+                    .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Xs),
             ) {
                 LiveGuideButton(onClick = onOpenGuide)
@@ -503,16 +495,19 @@ private fun LiveWideContent(
                 .weight(1f)
                 .fillMaxHeight()
                 .padding(
-                    start = SunsetSpacing.Lg,
+                    start = SunsetSpacing.Xl,
                     end = gutter,
                 ),
         ) {
             // The category title and channel count live inside the hero, so the grid gets the
             // vertical space a separate header row used to take.
+            val activeHeroChannel = focusedChannel
+                ?: previewChannel
+                ?: state.visibleChannels.firstOrNull()
             SunsetHeroPreviewHeader(
-                focusedChannel = focusedChannel,
+                focusedChannel = activeHeroChannel,
                 previewChannel = previewChannel,
-                programme = focusedChannel?.let { state.programmes[it.id] },
+                programme = activeHeroChannel?.let { state.programmes[it.id] },
                 previewEngine = previewEngine,
                 nowMs = nowMs,
                 selectedCategoryTitle = selectedEntry.label,
@@ -540,8 +535,8 @@ private fun LiveWideContent(
                             isGridFocused = it.hasFocus
                             if (!it.hasFocus) onClearFocus()
                         },
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(
                         top = 4.dp,
                         bottom = SunsetSpacing.Xl,
@@ -564,8 +559,10 @@ private fun LiveWideContent(
                             progress = (status as? ChannelStatus.Live)?.progress,
                             startsAtEpochMillis =
                                 (status as? ChannelStatus.Upcoming)?.startsAtEpochMillis,
-                            startedAtEpochMillis =
-                                (status as? ChannelStatus.Live)?.startedAtEpochMillis,
+                            liveStatusText = resolveCardChannelStatusText(
+                                status = status,
+                                nowTitle = programme?.title,
+                            ),
                             onFocusChanged = { isFocused ->
                                 if (isFocused) onChannelFocused(channel)
                             },
@@ -602,6 +599,58 @@ private fun LiveWideContent(
                 }
             }
         }
+    }
+}
+
+/**
+ * Compact tile subtitle. The programme title leads, and the event start only joins it when the
+ * provider actually published one. Regular 24/7 channels therefore read just `Family Guy`, while
+ * event and PPV tiles read `Live • 11:00 a.m.` without the repetitive word "Started".
+ */
+@Composable
+internal fun resolveCardChannelStatusText(
+    status: ChannelStatus,
+    nowTitle: String?,
+): String? {
+    val context = LocalContext.current
+    return when (status) {
+        is ChannelStatus.Upcoming -> stringResource(
+            R.string.live_starts_at,
+            SunsetFormat.time(context, status.startsAtEpochMillis),
+        )
+
+        is ChannelStatus.Live -> {
+            val title = nowTitle?.takeIf { it.isNotBlank() }
+                ?: status.programmeTitle?.takeIf { it.isNotBlank() }
+            val startedAt = status.startedAtEpochMillis
+                ?.let { SunsetFormat.time(context, it) }
+            when {
+                title != null && startedAt != null -> stringResource(
+                    R.string.live_programme_at,
+                    title,
+                    startedAt,
+                )
+                title != null -> title
+                startedAt != null -> stringResource(R.string.live_live_at, startedAt)
+                else -> null
+            }
+        }
+    }
+}
+
+/** Full hero subtitle keeps the descriptive `Live • Started …` wording; the hero has room for it. */
+@Composable
+internal fun resolveHeroChannelStatusText(status: ChannelStatus): String {
+    val context = LocalContext.current
+    return when (status) {
+        is ChannelStatus.Upcoming -> stringResource(
+            R.string.live_starts_at,
+            SunsetFormat.time(context, status.startsAtEpochMillis),
+        )
+
+        is ChannelStatus.Live -> status.startedAtEpochMillis?.let {
+            stringResource(R.string.live_started_at, SunsetFormat.time(context, it))
+        } ?: stringResource(R.string.live_status_live)
     }
 }
 

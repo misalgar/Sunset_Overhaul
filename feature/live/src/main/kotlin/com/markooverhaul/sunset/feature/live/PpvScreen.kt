@@ -194,8 +194,10 @@ fun PpvScreen(
                         progress = (status as? ChannelStatus.Live)?.progress,
                         startsAtEpochMillis =
                             (status as? ChannelStatus.Upcoming)?.startsAtEpochMillis,
-                        startedAtEpochMillis =
-                            (status as? ChannelStatus.Live)?.startedAtEpochMillis,
+                        liveStatusText = resolveCardChannelStatusText(
+                            status = status,
+                            nowTitle = programme?.title,
+                        ),
                     )
                 }
             }

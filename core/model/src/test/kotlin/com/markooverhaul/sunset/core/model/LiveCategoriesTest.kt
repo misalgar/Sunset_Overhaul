@@ -73,8 +73,10 @@ class LiveCategoriesTest {
             "NFL • $october 25",
             cleanCategoryDisplayName("NFL 25/10/26 (presiona boton update)"),
         )
-        assertEquals("Soccer • Domingo", cleanCategoryDisplayName("Live Soccer Domingo"))
-        assertEquals("Soccer • Lunes", cleanCategoryDisplayName("Live Soccer Lunes"))
+        assertEquals("Soccer • Dom", cleanCategoryDisplayName("Live Soccer Domingo"))
+        assertEquals("Soccer • Lun", cleanCategoryDisplayName("Live Soccer Lunes"))
+        assertEquals("Soccer • Mié", cleanCategoryDisplayName("Live Soccer Miércoles"))
+        assertEquals("Soccer • Wed", cleanCategoryDisplayName("Live Soccer Wednesday"))
         assertEquals("Canales 24/7", cleanCategoryDisplayName("Canales 24/7"))
     }
 
