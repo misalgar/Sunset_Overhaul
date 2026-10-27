@@ -196,6 +196,15 @@ fun HomeScreen(
                 }
             }
         }
+        // First rail whose whole body is on screen; a rail cut off at the top edge can take focus
+        // without showing a ring, which looked like a dead remote.
+        fun fullyVisibleRowKey(): String? {
+            val info = listState.layoutInfo
+            return info.visibleItemsInfo
+                .filter { it.offset >= info.viewportStartOffset && it.offset + it.size <= info.viewportEndOffset }
+                .mapNotNull { it.key as? String }
+                .firstOrNull { it in visibleRowKeys }
+        }
         var focusedRowKey by remember { mutableStateOf<String?>(null) }
         var focusedItem by remember { mutableStateOf<Pair<String, Any>?>(null) }
         var heroFocused by remember { mutableStateOf(false) }
@@ -297,9 +306,16 @@ fun HomeScreen(
                     .focusRequester(listEntryFocus)
                     .onFocusChanged { focusState ->
                         if (!focusState.isFocused) return@onFocusChanged
-                        val key = entryRowKey ?: visibleRowKeys.firstOrNull()
-                            ?: return@onFocusChanged
-                        focusRow(key)
+                        scope.launch {
+                            val visibleKey = fullyVisibleRowKey()
+                            val key = visibleKey ?: entryRowKey ?: visibleRowKeys.firstOrNull()
+                                ?: return@launch
+                            if (visibleKey == null) {
+                                val index = rowItemIndex(key)
+                                if (index >= 0) runCatching { listState.animateScrollToItem(index) }
+                            }
+                            focusRow(key)
+                        }
                     }
                     .focusable(),
             )

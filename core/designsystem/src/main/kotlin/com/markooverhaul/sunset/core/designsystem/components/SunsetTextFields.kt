@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,6 +35,8 @@ fun SunsetTextField(
     leadingIcon: ImageVector? = null,
     trailingText: String? = null,
     onTrailingClick: (() -> Unit)? = null,
+    /** Spoken label for the trailing action when the visible text is abbreviated. */
+    trailingContentDescription: String? = null,
     isPassword: Boolean = false,
     passwordVisible: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
@@ -42,12 +46,15 @@ fun SunsetTextField(
     supportingText: String? = null,
     placeholder: String? = null,
     enabled: Boolean = true,
+    /** TV: the field stays a plain focus stop and never opens the IME until asked to. */
+    readOnly: Boolean = false,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
+        readOnly = readOnly,
         label = { Text(text = label, style = MaterialTheme.typography.bodyLarge) },
         placeholder = placeholder?.let {
             { Text(text = it, color = SunsetColors.TextTertiary) }
@@ -59,11 +66,18 @@ fun SunsetTextField(
         },
         trailingIcon = if (trailingText != null && onTrailingClick != null) {
             {
-                IconButton(onClick = onTrailingClick) {
+                IconButton(
+                    onClick = onTrailingClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = trailingContentDescription ?: trailingText
+                    },
+                ) {
                     Text(
                         text = trailingText,
                         style = MaterialTheme.typography.labelLarge,
                         color = SunsetColors.AccentPrimary,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                 }
             }

@@ -43,7 +43,8 @@
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation"
             android:exported="true"
-            android:theme="@style/Theme.Sunset">
+            android:theme="@style/Theme.Sunset"
+            android:windowSoftInputMode="adjustResize">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

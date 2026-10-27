@@ -85,6 +85,8 @@
     <string name="login_password">Contraseña</string>
     <string name="login_show_password">Mostrar contraseña</string>
     <string name="login_hide_password">Ocultar contraseña</string>
+    <string name="login_show_password_short">Mostrar</string>
+    <string name="login_hide_password_short">Ocultar</string>
     <string name="login_submit">Iniciar sesión</string>
     <string name="login_remember_me">Recordarme</string>
     <string name="login_need_help">¿Necesitas ayuda?</string>
