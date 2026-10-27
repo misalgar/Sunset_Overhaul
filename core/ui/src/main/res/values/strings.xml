@@ -131,6 +131,9 @@
     <string name="live_guide_hint">Press ◀ for categories</string>
     <string name="live_starts_at">Starts %1$s</string>
     <string name="live_hero_hint">Browse the channels to preview what is on now.</string>
+    <string name="live_hero_watch_hint">Press OK to watch full screen</string>
+    <string name="live_hero_categories_hint">◀ Categories</string>
+    <string name="live_minutes_left">%1$d min left</string>
     <string name="live_status_live">Live</string>
     <string name="live_group_genres">Genres</string>
     <string name="live_group_events">Live Events</string>

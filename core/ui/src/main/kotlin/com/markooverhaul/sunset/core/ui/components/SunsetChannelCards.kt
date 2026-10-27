@@ -207,10 +207,10 @@ fun SunsetChannelRow(
 }
 
 /**
- * Dense live tile for the 2-column TV grid. The card has a strict 76 dp height so every row in the
- * grid aligns, a 56 dp framed logo, a 17/15 sp two-line title, and a single status row with the
- * LIVE badge (or the scheduled start) next to the current programme. Holding Select toggles the
- * favourite without adding a second focus stop.
+ * Dense live tile for the 2-column TV grid. The card has a strict 64 dp height so four rows fit
+ * above the fold, a 44 dp logo badge, a single-line title, and a status row with LIVE (or the
+ * scheduled start) next to the current programme. Holding Select toggles the favourite without
+ * adding a second focus stop.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -235,8 +235,8 @@ fun SunsetLiveChannelTile(
     val shape = RoundedCornerShape(SunsetRadius.Sm)
     val titleStyle = MaterialTheme.typography.bodyLarge.copy(
         fontWeight = FontWeight.SemiBold,
-        fontSize = if (channel.name.length > 24) 15.sp else 17.sp,
-        lineHeight = if (channel.name.length > 24) 18.sp else 20.sp,
+        fontSize = if (channel.name.length > 24) 14.sp else 16.sp,
+        lineHeight = 18.sp,
     )
     SunsetFocusable(
         onClick = {
@@ -270,7 +270,7 @@ fun SunsetLiveChannelTile(
         shape = shape,
         scaleOnFocus = false,
     ) {
-        val cardColor = if (focused) Color(0xFF202836) else Color(0xFF161B24)
+        val cardColor = if (focused) Color(0xFF202938) else Color(0xFF161C26)
         val borderColor = if (focused) {
             SunsetColors.FocusRing
         } else {
@@ -279,7 +279,7 @@ fun SunsetLiveChannelTile(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(76.dp)
+                .height(64.dp)
                 .background(cardColor)
                 .border(1.dp, borderColor, shape),
         ) {
@@ -290,7 +290,11 @@ fun SunsetLiveChannelTile(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                FramedChannelLogo(name = channel.name, logoUrl = channel.logoUrl)
+                SunsetChannelLogoBadge(
+                    name = channel.name,
+                    logoUrl = channel.logoUrl,
+                    size = 44.dp,
+                )
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.Center,
@@ -304,7 +308,7 @@ fun SunsetLiveChannelTile(
                         },
                         style = titleStyle,
                         color = SunsetColors.TextPrimary,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         onTextLayout = { result -> titleOverflows = result.hasVisualOverflow },
                     )
@@ -378,21 +382,22 @@ fun SunsetLiveChannelTile(
 }
 
 /**
- * 50 dp logo on a solid white badge so JPEG logos with baked-in white backgrounds look uniform
- * against the deep slate card.
+ * Solid white logo badge so JPEG logos with baked-in white backgrounds look uniform against the
+ * deep slate cards and the Live hero.
  */
 @Composable
-private fun FramedChannelLogo(
+fun SunsetChannelLogoBadge(
     name: String,
     logoUrl: String?,
     modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
 ) {
     Box(
         modifier = modifier
-            .size(50.dp)
+            .size(size)
             .background(
                 color = Color.White,
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(8.dp),
             )
             .padding(4.dp),
         contentAlignment = Alignment.Center,

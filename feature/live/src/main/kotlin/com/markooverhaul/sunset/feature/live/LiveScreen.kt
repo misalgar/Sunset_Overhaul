@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -87,6 +88,7 @@ import kotlinx.coroutines.launch
 
 /** Width from which the master-detail layout replaces the phone chip row. */
 private val WideLayoutMinWidth = 840.dp
+private val SidebarWidth = 240.dp
 private const val CATEGORY_PREVIEW_DEBOUNCE_MS = 250L
 
 @Composable
@@ -161,8 +163,6 @@ fun LiveScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isWide = isTv || maxWidth >= WideLayoutMinWidth
         val gutter = if (isTv) SunsetSpacing.Xxxl else SunsetSpacing.Lg
-        // Keep the hero to roughly a third of the content area so two channel rows stay visible.
-        val heroHeight = maxHeight * 0.32f
 
         Column(modifier = Modifier.fillMaxSize()) {
             SunsetDemoBanner()
@@ -185,35 +185,24 @@ fun LiveScreen(
                     modifier = Modifier.padding(horizontal = gutter),
                 )
 
-                isWide -> Column(modifier = Modifier.fillMaxSize()) {
-                    SunsetHeroPreviewHeader(
-                        focusedChannel = focusedChannel,
-                        previewChannel = previewChannel,
-                        programme = focusedChannel?.let { state.programmes[it.id] },
-                        previewEngine = previewEngine,
-                        nowMs = nowMs,
-                        height = heroHeight,
-                        modifier = Modifier
-                            .padding(horizontal = gutter)
-                            .padding(top = SunsetSpacing.Sm),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    LiveWideContent(
-                        state = state,
-                        entries = entries,
-                        gutter = gutter,
-                        nowMs = nowMs,
-                        lastPlayedChannelId = lastPlayedChannelId,
-                        onChannelFocused = onChannelFocused,
-                        onClearFocus = onClearFocus,
-                        onPlayChannel = onPlayChannel,
-                        onOpenGuide = onOpenGuide,
-                        onSelectFilter = onSelectFilter,
-                        onToggleFavourite = onToggleFavourite,
-                        onRetry = onRetry,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                isWide -> LiveWideContent(
+                    state = state,
+                    entries = entries,
+                    gutter = gutter,
+                    nowMs = nowMs,
+                    focusedChannel = focusedChannel,
+                    previewChannel = previewChannel,
+                    previewEngine = previewEngine,
+                    lastPlayedChannelId = lastPlayedChannelId,
+                    onChannelFocused = onChannelFocused,
+                    onClearFocus = onClearFocus,
+                    onPlayChannel = onPlayChannel,
+                    onOpenGuide = onOpenGuide,
+                    onSelectFilter = onSelectFilter,
+                    onToggleFavourite = onToggleFavourite,
+                    onRetry = onRetry,
+                    modifier = modifier,
+                )
 
                 else -> LiveCompactContent(
                     state = state,
@@ -308,6 +297,9 @@ private fun LiveWideContent(
     entries: List<LiveFilterEntry>,
     gutter: Dp,
     nowMs: Long,
+    focusedChannel: LiveChannel?,
+    previewChannel: LiveChannel?,
+    previewEngine: PlaybackEngine?,
     lastPlayedChannelId: String?,
     onChannelFocused: (LiveChannel) -> Unit,
     onClearFocus: () -> Unit,
@@ -422,15 +414,16 @@ private fun LiveWideContent(
     }
 
     Row(modifier = modifier.fillMaxSize()) {
+        // Full-height sidebar: the hero lives in the right pane, so the category list is never
+        // squeezed into the bottom half of the screen.
         Box(
             modifier = Modifier
-                .weight(0.27f)
+                .width(SidebarWidth)
                 .fillMaxHeight()
                 .padding(
                     start = gutter,
-                    end = SunsetSpacing.Md,
                     top = SunsetSpacing.Md,
-                    bottom = SunsetSpacing.Lg,
+                    bottom = SunsetSpacing.Md,
                 ),
         ) {
             Column(
@@ -441,7 +434,7 @@ private fun LiveWideContent(
                         shape = RoundedCornerShape(SunsetRadius.Lg),
                     )
                     .padding(SunsetSpacing.Md),
-                verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
+                verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Xs),
             ) {
                 LiveGuideButton(onClick = onOpenGuide)
 
@@ -506,17 +499,28 @@ private fun LiveWideContent(
 
         Column(
             modifier = Modifier
-                .weight(0.73f)
+                .weight(1f)
                 .fillMaxHeight()
                 .padding(
-                    start = SunsetSpacing.Md,
+                    start = SunsetSpacing.Lg,
                     end = gutter,
-                    top = SunsetSpacing.Xl,
                 ),
         ) {
-            LiveGridHeader(entry = selectedEntry, showHint = isGridFocused)
+            // The category title and channel count live inside the hero, so the grid gets the
+            // vertical space a separate header row used to take.
+            SunsetHeroPreviewHeader(
+                focusedChannel = focusedChannel,
+                previewChannel = previewChannel,
+                programme = focusedChannel?.let { state.programmes[it.id] },
+                previewEngine = previewEngine,
+                nowMs = nowMs,
+                selectedCategoryTitle = selectedEntry.label,
+                channelCount = selectedEntry.count,
+                isGridFocused = isGridFocused,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Spacer(modifier = Modifier.height(SunsetSpacing.Md))
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (state.visibleChannels.isEmpty()) {
                 SunsetEmptyState(
@@ -534,8 +538,8 @@ private fun LiveWideContent(
                             isGridFocused = it.hasFocus
                             if (!it.hasFocus) onClearFocus()
                         },
-                    horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
-                    verticalArrangement = Arrangement.spacedBy(SunsetSpacing.Md),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = SunsetSpacing.Xl),
                 ) {
                     itemsIndexed(
@@ -613,7 +617,7 @@ private fun LiveGuideButton(onClick: () -> Unit) {
                 .padding(3.dp)
                 .background(container, shape)
                 .border(1.dp, borderColor, shape)
-                .padding(horizontal = SunsetSpacing.Sm, vertical = SunsetSpacing.Md),
+                .padding(horizontal = SunsetSpacing.Sm, vertical = SunsetSpacing.Sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(
                 space = SunsetSpacing.Sm,
@@ -708,8 +712,8 @@ private fun LiveSidebarFilterRow(
                 .padding(
                     start = 12.dp,
                     end = 8.dp,
-                    top = SunsetSpacing.Sm,
-                    bottom = SunsetSpacing.Sm,
+                    top = 8.dp,
+                    bottom = 8.dp,
                 ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SunsetSpacing.Sm),
@@ -736,42 +740,6 @@ private fun LiveSidebarFilterRow(
                 color = SunsetColors.TextTertiary,
                 maxLines = 1,
                 softWrap = false,
-            )
-        }
-    }
-}
-
-@Composable
-private fun LiveGridHeader(entry: LiveFilterEntry, showHint: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = entry.label,
-                style = MaterialTheme.typography.titleLarge,
-                color = SunsetColors.TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = pluralStringResource(
-                    R.plurals.live_channel_count,
-                    entry.count,
-                    entry.count,
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = SunsetColors.TextSecondary,
-                maxLines = 1,
-            )
-        }
-        if (showHint) {
-            Text(
-                text = stringResource(R.string.live_guide_hint),
-                style = MaterialTheme.typography.labelMedium,
-                color = SunsetColors.TextSecondary,
-                maxLines = 1,
             )
         }
     }

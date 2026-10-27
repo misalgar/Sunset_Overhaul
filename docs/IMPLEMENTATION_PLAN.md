@@ -667,6 +667,29 @@ Verified on Fire TV: zapping across Trev→MegaTV→Telemundo (including dead fe
 Telemundo San Juan with its 6–8 PM guide entry, the PPV tile grid, and the preview starting after
 the rest delay and resuming after Back.
 
+### 5.31 Live TV grid: full-height sidebar and compact hero (2026-10-26)
+
+The hero used to span the full width above the 2-pane row, which squeezed the sidebar to a handful
+of categories and the channel grid to 4–6 tiles.
+
+- The wide layout is now a single `Row`: a 240 dp full-height sidebar, then the right pane with the
+  hero, a 12 dp spacer and the grid. The sidebar shows 9+ rows without scrolling.
+- The separate "All channels / 976 channels" header row is gone. The category name and channel
+  count are the hero breadcrumb (`ALL CHANNELS • 976 channels`), with a compact `◀ Categories`
+  hint on the right when the grid has focus.
+- The hero is a 176 dp card (`#141923`, 14 dp radius, 1 dp white 8% border) with no outer padding.
+  The metadata column uses a 44 dp white logo badge, a 22 sp channel name, programme title plus
+  time range, and up to two description lines (or the "Press OK" hint). The 16:9 preview fills the
+  card height (~313 dp wide), bleeds to the right edge and blends into the card with an 80 dp
+  horizontal gradient. The bottom gradient keeps the live progress line and "X min left".
+- Channel tiles are 64 dp tall with a 44 dp logo badge and a single-line title; the grid uses
+  10 dp horizontal and 8 dp vertical gaps and full-height slate surfaces (`#161C26` /
+  `#202938`). Four full rows (eight channels) are visible on a 1080p Fire TV.
+- `SunsetChannelLogoBadge` is shared by the tile and the hero so the white badge never drifts.
+
+Verified on Fire TV: full-height category list, hero tracking focus with the programme description,
+preview, progress and "13 min left", and four complete channel rows above the fold.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
