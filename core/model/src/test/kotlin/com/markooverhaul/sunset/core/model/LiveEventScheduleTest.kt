@@ -58,6 +58,42 @@ class LiveEventScheduleTest {
     }
 
     @Test
+    fun `reads a clock behind a panel prefix and cleans the name`() {
+        val schedule = parseLiveEventSchedule(
+            rawName = "NHL 01 | 05:00 PM | Columbus Blue Jackets vs. New York Rangers",
+            categoryName = "NHL 27/10/26",
+            panelNowUtcMs = panelTime(2026, 10, 27, 13),
+            panelTimeZoneId = panelZone.id,
+        )
+        assertEquals(panelTime(2026, 10, 27, 17), schedule?.startsAtUtcMs)
+        assertEquals("Columbus Blue Jackets vs. New York Rangers", schedule?.displayName)
+    }
+
+    @Test
+    fun `reads a prefixed 24-hour clock`() {
+        val schedule = parseLiveEventSchedule(
+            rawName = "MLB 02 | 19:10 | Dodgers vs Padres",
+            categoryName = "MLB 27/10/26",
+            panelNowUtcMs = panelTime(2026, 10, 27, 13),
+            panelTimeZoneId = panelZone.id,
+        )
+        assertEquals(panelTime(2026, 10, 27, 19, 10), schedule?.startsAtUtcMs)
+        assertEquals("Dodgers vs Padres", schedule?.displayName)
+    }
+
+    @Test
+    fun `keeps the panel label when the prefix has no matchup`() {
+        val schedule = parseLiveEventSchedule(
+            rawName = "NHL 01 | 05:00 PM |",
+            categoryName = "NHL 27/10/26",
+            panelNowUtcMs = panelTime(2026, 10, 27, 13),
+            panelTimeZoneId = panelZone.id,
+        )
+        assertEquals(panelTime(2026, 10, 27, 17), schedule?.startsAtUtcMs)
+        assertEquals("NHL 01", schedule?.displayName)
+    }
+
+    @Test
     fun `uses the date from the category`() {
         val schedule = parseLiveEventSchedule(
             rawName = "21:10 Tijuana v Cruz Azul",
@@ -80,7 +116,7 @@ class LiveEventScheduleTest {
     }
 
     @Test
-    fun `ignores channels without a leading time`() {
+    fun `ignores channels without a clock`() {
         assertNull(
             parseLiveEventSchedule(
                 rawName = "ESPN",
@@ -93,6 +129,14 @@ class LiveEventScheduleTest {
             parseLiveEventSchedule(
                 rawName = "24/7 Noticias",
                 categoryName = "Noticias",
+                panelNowUtcMs = panelTime(2026, 10, 25, 13),
+                panelTimeZoneId = panelZone.id,
+            ),
+        )
+        assertNull(
+            parseLiveEventSchedule(
+                rawName = "DAZN 1",
+                categoryName = "DAZN",
                 panelNowUtcMs = panelTime(2026, 10, 25, 13),
                 panelTimeZoneId = panelZone.id,
             ),

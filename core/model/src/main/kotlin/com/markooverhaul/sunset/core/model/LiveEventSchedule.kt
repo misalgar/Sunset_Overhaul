@@ -26,10 +26,18 @@ fun isUpcomingEvent(startUtcMs: Long?, nowUtcMs: Long): Boolean =
 fun LiveEventSchedule.isUpcoming(nowUtcMs: Long): Boolean =
     isUpcomingEvent(startsAtUtcMs, nowUtcMs)
 
+/**
+ * The clock can lead the name (`21:10 Tijuana vs …`) or sit behind a panel prefix
+ * (`NHL 01 | 05:00 PM | Columbus Blue Jackets vs …`). Matching the first clock token anywhere
+ * keeps one parser for every event category; names without a clock (for example DAZN) stay raw.
+ */
 private val EventNameTime = Regex(
-    """^\s*(\d{1,2})[:;](\d{2})\s*(?:([ap])\.?\s*m\.?)?\s*(?:[|·•:\-–—]\s*)?(.*)$""",
+    """(?:^|[\s|·•:\-–—])(\d{1,2})[:;](\d{2})\s*(?:([ap])\.?\s*m\.?)?\s*(?:[|·•:\-–—]\s*)?(.*)$""",
     RegexOption.IGNORE_CASE,
 )
+
+/** Separators the panel wraps around the clock and matchup; trimmed from the display name. */
+private val DisplaySeparators = charArrayOf('|', '·', '•', ':', ' ')
 
 private val CategoryDate = Regex("""\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b""")
 
@@ -102,7 +110,14 @@ fun parseLiveEventSchedule(
         calendar.set(Calendar.MILLISECOND, 0)
     }
 
-    val display = match.groupValues[4].trim().ifBlank { rawName.trim() }
+    val display = match.groupValues[4].trim().trim(*DisplaySeparators).ifBlank {
+        // No matchup after the clock: keep the panel's event label (`NHL 01`) instead of the
+        // raw name with the clock still embedded.
+        rawName.substring(0, match.range.first)
+            .trim()
+            .trimEnd(*DisplaySeparators)
+            .ifBlank { rawName.trim() }
+    }
     return LiveEventSchedule(startsAtUtcMs = calendar.timeInMillis, displayName = display)
 }
 

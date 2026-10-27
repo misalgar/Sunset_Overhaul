@@ -874,6 +874,30 @@ p.m.`; PPV reads `Live • 2:00 a.m.`; unfocused tiles have no border or star, t
 both; the hero previews the first channel while the sidebar is focused. Unit tests cover the
 event-only start rule. Full gate: `testDebugUnitTest :app:assembleDebug :app:lintDebug` passes.
 
+### 5.38 Event names with a panel prefix parse like leading clocks (2026-10-27)
+
+Some event feeds put a panel label before the clock instead of starting with it, for example
+`NHL 01 | 05:00 PM | Columbus Blue Jackets vs. New York Rangers`. The parser only matched a clock at
+the start of the name, so those channels kept the raw provider name, no `scheduledStartUtcMs`, and a
+plain `Live` status while LMP cards showed `Live • 5:00 p.m.`.
+
+- `EventNameTime` now matches the first clock token anywhere in the name. The leading boundary is
+  `^` or a panel separator (`space | · • : - – —`), and an optional separator after the clock is
+  consumed. A leading clock (`21:10 Tijuana vs …`) still parses exactly as before.
+- The display name is group 4 trimmed of the `|`, `·`, `•`, `:` and space separators the panel wraps
+  around the matchup. When nothing follows the clock, the label before it is kept (`NHL 01`) rather
+  than the raw name with the clock still embedded.
+- Names without a clock stay raw and schedule-less, so DAZN's `DAZN 1` / `DAZN 2` cards keep their
+  provider names and the generic `Live` status; no request or probe is added.
+- Tests cover a prefixed 12-hour NHL name, a prefixed 24-hour MLB name, a prefix-only name, and the
+  no-clock DAZN case alongside the existing leading-clock cases.
+
+Verification on Fire TV (192.168.4.26): NHL tiles read the clean matchup with `Live • 5:00 p.m.` /
+`Starts 7:00 p.m.` and the hero reads `Live • Started 5:00 p.m.`; MLB and NCAA FB parse the same
+way; DAZN tiles remain `DAZN 1` / `DAZN 2` with `Live`. Targeted gate
+(`:core:model:testDebugUnitTest :feature:live:testDebugUnitTest :feature:live:assembleDebug`) and
+`:app:assembleDebug` pass.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
