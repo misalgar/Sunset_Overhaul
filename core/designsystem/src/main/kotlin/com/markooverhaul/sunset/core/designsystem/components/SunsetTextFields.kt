@@ -1,6 +1,8 @@
 package com.markooverhaul.sunset.core.designsystem.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -112,7 +114,13 @@ fun SunsetTextField(
     )
 }
 
-/** Search entry with clear affordance; debounce belongs in the feature, not the component. */
+/**
+ * Search entry with clear affordance; debounce belongs in the feature, not the component.
+ *
+ * [showClearAction] is false when the caller draws its own clear control. A trailing icon lives
+ * inside the text field, so on TV it can never take focus (the field consumes Left/Right for the
+ * cursor); callers that need a focusable X hide this one and place a real focus stop over it.
+ */
 @Composable
 fun SunsetSearchField(
     value: String,
@@ -121,6 +129,7 @@ fun SunsetSearchField(
     clearDescription: String,
     modifier: Modifier = Modifier,
     onSearch: () -> Unit = {},
+    showClearAction: Boolean = true,
 ) {
     OutlinedTextField(
         value = value,
@@ -130,18 +139,24 @@ fun SunsetSearchField(
         leadingIcon = {
             Icon(Icons.Rounded.Search, contentDescription = null, tint = SunsetColors.TextSecondary)
         },
-        trailingIcon = if (value.isNotEmpty()) {
-            {
-                IconButton(onClick = { onValueChange("") }) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = clearDescription,
-                        tint = SunsetColors.TextSecondary,
-                    )
+        trailingIcon = when {
+            value.isEmpty() -> null
+            // Reserve the same width so the text never runs under the caller's focus stop.
+            !showClearAction -> {
+                { Spacer(modifier = Modifier.width(48.dp)) }
+            }
+
+            else -> {
+                {
+                    IconButton(onClick = { onValueChange("") }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = clearDescription,
+                            tint = SunsetColors.TextSecondary,
+                        )
+                    }
                 }
             }
-        } else {
-            null
         },
         singleLine = true,
         shape = RoundedCornerShape(SunsetRadius.Sm),

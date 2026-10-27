@@ -15,11 +15,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -47,6 +53,7 @@ import kotlinx.coroutines.delay
 import com.markooverhaul.sunset.core.designsystem.components.CategoryChip
 import com.markooverhaul.sunset.core.designsystem.components.SunsetEmptyState
 import com.markooverhaul.sunset.core.designsystem.components.SunsetErrorState
+import com.markooverhaul.sunset.core.designsystem.components.SunsetFocusable
 import com.markooverhaul.sunset.core.designsystem.components.SunsetSectionHeader
 import com.markooverhaul.sunset.core.designsystem.components.SunsetSearchField
 import com.markooverhaul.sunset.core.designsystem.components.sunsetFocusRing
@@ -126,6 +133,9 @@ fun SearchScreen(
     val fieldFocusRequester = remember { FocusRequester() }
     val launcherFocusRequester = remember { FocusRequester() }
     val resultsFocusRequester = remember { FocusRequester() }
+    // TV: the clear X is a real focus stop beside the box; inside the text field it could never be
+    // reached, because the field keeps Left/Right for the cursor.
+    val clearFocusRequester = remember { FocusRequester() }
     // The nav bar's Down key focuses this; without it the key is consumed and nothing happens.
     val entryFocus = LocalContentEntryFocus.current
     val launcherInteraction = remember { MutableInteractionSource() }
@@ -135,6 +145,7 @@ fun SearchScreen(
     // navigating up/down past the field can never pop the keyboard (reported on Fire TV).
     var editing by remember { mutableStateOf(!isTv) }
     var launcherFocused by remember { mutableStateOf(false) }
+    var clearFocused by remember { mutableStateOf(false) }
     var wasImeVisible by remember { mutableStateOf(false) }
     var wasEditing by remember { mutableStateOf(false) }
     var returnFocusToLauncher by remember { mutableStateOf(false) }
@@ -222,6 +233,15 @@ fun SearchScreen(
         } else {
             editing = false
         }
+    }
+
+    // The X disappears with the query, so hand focus back to the box in the same action.
+    val clearSearch: () -> Unit = {
+        wasEditing = false
+        editing = false
+        keyboardController?.hide()
+        onQueryChange("")
+        returnFocusToLauncher = true
     }
 
     LaunchedEffect(pendingResultsFocus, state.isSearching, focusGroup, results, state.error) {
@@ -327,12 +347,22 @@ fun SearchScreen(
                                             false
                                         } else {
                                             when {
+                                                // The clear X owns its own keys while it holds focus.
+                                                clearFocused -> false
+
                                                 // Select is the only way to open the keyboard.
                                                 !editing && (
                                                     event.key == Key.DirectionCenter ||
                                                         event.key == Key.Enter
                                                     ) -> {
                                                     editing = true
+                                                    true
+                                                }
+
+                                                // Right reaches the clear X without opening the IME.
+                                                !editing && event.key == Key.DirectionRight &&
+                                                    state.query.isNotEmpty() -> {
+                                                    runCatching { clearFocusRequester.requestFocus() }
                                                     true
                                                 }
 
@@ -369,6 +399,9 @@ fun SearchScreen(
                         placeholder = stringResource(R.string.search_placeholder),
                         clearDescription = stringResource(R.string.search_clear),
                         onSearch = submitAndShowResults,
+                        // On TV the X is drawn below as a focusable sibling, because anything inside
+                        // the text field is unreachable from the D-pad.
+                        showClearAction = !isTv,
                         modifier = Modifier.then(
                             if (isTv) {
                                 Modifier
@@ -428,6 +461,57 @@ fun SearchScreen(
                             },
                         ),
                     )
+
+                    // TV: the clear X lives inside the text field in the design system, where the
+                    // field's cursor handling makes it unreachable. Draw a real focus stop over it
+                    // and let Right from the box land here.
+                    if (isTv && state.query.isNotEmpty()) {
+                        SunsetFocusable(
+                            onClick = clearSearch,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 8.dp)
+                                .size(48.dp)
+                                .focusRequester(clearFocusRequester)
+                                .onFocusChanged { clearFocused = it.isFocused }
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type != KeyEventType.KeyDown) {
+                                        false
+                                    } else {
+                                        when (event.key) {
+                                            Key.DirectionLeft -> {
+                                                runCatching { launcherFocusRequester.requestFocus() }
+                                                true
+                                            }
+
+                                            Key.DirectionDown -> {
+                                                if (focusGroup == null) {
+                                                    false
+                                                } else {
+                                                    runCatching { resultsFocusRequester.requestFocus() }
+                                                    true
+                                                }
+                                            }
+
+                                            else -> false
+                                        }
+                                    }
+                                },
+                            shape = CircleShape,
+                            scaleOnFocus = false,
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = stringResource(R.string.search_clear),
+                                    tint = SunsetColors.TextSecondary,
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
