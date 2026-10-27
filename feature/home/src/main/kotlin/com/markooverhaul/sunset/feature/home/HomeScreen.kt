@@ -1,5 +1,6 @@
 ﻿package com.markooverhaul.sunset.feature.home
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -16,10 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -55,6 +59,7 @@ import com.markooverhaul.sunset.core.ui.components.SunsetHeroBillboard
 import com.markooverhaul.sunset.core.ui.components.SunsetLandscapeCard
 import com.markooverhaul.sunset.core.ui.components.SunsetPosterCard
 import com.markooverhaul.sunset.core.ui.util.SunsetFormat
+import kotlinx.coroutines.delay
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -135,13 +140,7 @@ fun HomeScreen(
         // entering Home from the top bar is deterministic, and row navigation reuses the same one.
         val entryFocus = LocalContentEntryFocus.current
         val heroFocus = remember(entryFocus) { entryFocus ?: FocusRequester() }
-        var initialHeroFocusApplied by remember { mutableStateOf(false) }
-        LaunchedEffect(state.hero?.id, isTv) {
-            if (isTv && state.hero != null && !initialHeroFocusApplied) {
-                initialHeroFocusApplied = true
-                runCatching { heroFocus.requestFocus() }
-            }
-        }
+        val listEntryFocus = remember(entryFocus) { entryFocus ?: FocusRequester() }
         val rowFocus = remember {
             mapOf(
                 "continue" to FocusRequester(),
@@ -178,8 +177,56 @@ fun HomeScreen(
         }
         val listState = rememberLazyListState()
         val scope = rememberCoroutineScope()
+        // The nav bar's Down handler targets one FocusRequester. Leaving Home scrolled past the
+        // hero used to leave that requester attached to a disposed Play button, so Down did
+        // nothing. Re-target it to the first rail that is actually on screen.
+        val heroVisible by remember(listState) {
+            derivedStateOf {
+                listState.layoutInfo.visibleItemsInfo.any { it.key == "hero" }
+            }
+        }
+        val entryRowKey by remember(listState, visibleRowKeys) {
+            derivedStateOf {
+                if (heroVisible) {
+                    null
+                } else {
+                    listState.layoutInfo.visibleItemsInfo
+                        .mapNotNull { it.key as? String }
+                        .firstOrNull { it in visibleRowKeys }
+                }
+            }
+        }
         var focusedRowKey by remember { mutableStateOf<String?>(null) }
         var focusedItem by remember { mutableStateOf<Pair<String, Any>?>(null) }
+        var heroFocused by remember { mutableStateOf(false) }
+
+        // Returning from another top-level destination can leave no Compose focus target at all,
+        // which makes every D-pad key dead. Put focus back on whatever is visible when Home
+        // resumes: the hero when it is on screen, otherwise the first rail.
+        val currentHeroVisible by rememberUpdatedState(heroVisible)
+        val currentEntryRowKey by rememberUpdatedState(entryRowKey)
+        val currentHeroFocused by rememberUpdatedState(heroFocused)
+        val currentRowFocused by rememberUpdatedState(focusedRowKey)
+
+        // The restored LazyColumn can take a few frames to lay out, so retry until a visible
+        // target accepts focus instead of giving up on the first attempt.
+        suspend fun restoreContentFocus() {
+            repeat(10) {
+                delay(100)
+                if (currentHeroFocused || currentRowFocused != null) return
+                val focused = if (currentHeroVisible) {
+                    runCatching { heroFocus.requestFocus() }.isSuccess
+                } else {
+                    // The list itself is the stable entry target when the hero is scrolled away;
+                    // its focus handler forwards to a visible card.
+                    runCatching { listEntryFocus.requestFocus() }.isSuccess
+                }
+                if (focused) return
+            }
+        }
+        LaunchedEffect(state.isLoading, state.hero?.id) {
+            restoreContentFocus()
+        }
         val heroItemOffset = if (state.hero != null || state.loadingCatalogue) 1 else 0
 
         fun itemFocusModifier(
@@ -240,6 +287,24 @@ fun HomeScreen(
             visibleRowKeys.getOrNull(index + 1)?.let(::focusRow)
         }
 
+        // Stable focus anchor for the shell's Down/entry requests. Cards are lazy and the hero
+        // can be scrolled away, so this 1 dp box is the only target that always exists; it hands
+        // focus straight to a visible card.
+        if (isTv && !heroVisible) {
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .focusRequester(listEntryFocus)
+                    .onFocusChanged { focusState ->
+                        if (!focusState.isFocused) return@onFocusChanged
+                        val key = entryRowKey ?: visibleRowKeys.firstOrNull()
+                            ?: return@onFocusChanged
+                        focusRow(key)
+                    }
+                    .focusable(),
+            )
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -255,11 +320,18 @@ fun HomeScreen(
                             false
                         }
 
-                        Key.DirectionDown -> if (row != null) {
-                            moveDown(row)
-                            true
-                        } else {
-                            false
+                        Key.DirectionDown -> when {
+                            row != null -> {
+                                moveDown(row)
+                                true
+                            }
+                            // Hero or another non-row control: drop into the first rail.
+                            visibleRowKeys.isNotEmpty() -> {
+                                focusRow(visibleRowKeys.first())
+                                true
+                            }
+
+                            else -> false
                         }
 
                         else -> false
@@ -321,6 +393,7 @@ fun HomeScreen(
                             isTv = isTv,
                             height = heroHeight,
                             focusRequester = heroFocus,
+                            onFocusChange = { heroFocused = it },
                             onPlay = { onPlayMovie(hero) },
                             onResume = onResume,
                             onDetails = { onOpenDetails(ContentType.MOVIE, hero.id) },
@@ -580,6 +653,7 @@ private fun HeroSection(
     isTv: Boolean,
     height: androidx.compose.ui.unit.Dp,
     focusRequester: FocusRequester,
+    onFocusChange: (Boolean) -> Unit,
     onPlay: () -> Unit,
     onResume: (WatchProgress) -> Unit,
     onDetails: () -> Unit,
@@ -602,7 +676,13 @@ private fun HeroSection(
         imageUrl = movie.backdropUrl ?: movie.posterUrl,
         primaryLabel = stringResource(if (resumable) R.string.action_resume else R.string.action_play),
         onPrimary = { if (progress != null && resumable) onResume(progress) else onPlay() },
-        primaryButtonModifier = if (isTv) Modifier.focusRequester(focusRequester) else Modifier,
+        primaryButtonModifier = if (isTv) {
+            Modifier
+                .focusRequester(focusRequester)
+                .onFocusChanged { onFocusChange(it.isFocused) }
+        } else {
+            Modifier
+        },
         secondaryLabel = stringResource(R.string.action_more_info),
         onSecondary = onDetails,
         height = height,

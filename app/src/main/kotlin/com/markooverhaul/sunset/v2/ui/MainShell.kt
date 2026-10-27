@@ -30,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -58,6 +59,7 @@ import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.LocalContentEntryFocus
 import com.markooverhaul.sunset.v2.navigation.SunsetNavHost
 import com.markooverhaul.sunset.v2.navigation.SunsetRoutes
+import kotlinx.coroutines.delay
 
 private const val LARGE_SCREEN_DP = 840
 
@@ -133,6 +135,19 @@ fun MainShell(
     // Screens attach this to their first focusable item so Down from the nav is deterministic
     // instead of following the nearest geometric chip.
     val contentEntryFocus = remember { FocusRequester() }
+
+    // A top-level destination can be restored with no focus target at all (for example Back from
+    // Live TV to a Home that is scrolled past its hero), which makes the D-pad dead. Re-attach
+    // focus to the screen's entry item whenever a top-level route becomes current.
+    LaunchedEffect(currentRoute) {
+        if (!showTopBar) return@LaunchedEffect
+        repeat(10) {
+            delay(100)
+            if (runCatching { contentEntryFocus.requestFocus() }.isSuccess) {
+                return@LaunchedEffect
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),

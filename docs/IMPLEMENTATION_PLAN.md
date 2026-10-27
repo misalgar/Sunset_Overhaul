@@ -690,6 +690,26 @@ of categories and the channel grid to 4–6 tiles.
 Verified on Fire TV: full-height category list, hero tracking focus with the programme description,
 preview, progress and "13 min left", and four complete channel rows above the fold.
 
+### 5.32 Fix dead D-pad on Home after Live TV (2026-10-27)
+
+Symptom: after visiting Live TV and going Back, Home could ignore the D-pad. The nav's Down
+handler focuses `LocalContentEntryFocus`, but Home only attached that requester to the hero Play
+button. When Home was scrolled past the hero, that button was not composed, so the requester was
+unbound and `requestFocus()` failed silently. The restored LazyColumn also had no focus target of
+its own, so the first key press could be swallowed or just focus the nav.
+
+- Home now attaches the entry requester to the hero when it is visible, otherwise to a stable 1 dp
+  focus anchor that forwards focus to the first visible rail's first visible card.
+- `MainShell` re-requests the entry focus whenever a top-level route becomes current (Back from
+  Live, nav taps) and retries for up to a second while the restored list lays out.
+- Down while the hero is focused now explicitly moves to the first rail instead of relying on
+  geometric focus search.
+- Home's load-time restore effect uses the same hero/anchor targets.
+
+Tests/verification note: the anchor was observed receiving the shell focus on return. The final
+on-device confirmation was interrupted by Fire TV's "Low on Storage Space" system dialog (which
+takes focus away from the app), so a clean re-test is still worth doing after freeing space.
+
 ## 6. Verification
 
 ### 6.1 Automated checks
