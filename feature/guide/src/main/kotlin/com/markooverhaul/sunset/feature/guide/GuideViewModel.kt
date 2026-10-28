@@ -113,7 +113,16 @@ class GuideViewModel @Inject constructor(
         const val OTHER_COUNTRY = "__other__"
 
         /** Local midnight for today, or tomorrow when [dayOffset] is 1. */
-        fun startOfDay(dayOffset: Int): Long = Calendar.getInstance().apply {
+        fun startOfDay(dayOffset: Int): Long = startOfDay(System.currentTimeMillis(), dayOffset)
+
+        /**
+         * Local midnight of the day that contains [referenceUtcMs], offset by [dayOffset] days.
+         *
+         * The reference time is a parameter so a visual test can freeze the clock and get the same
+         * day boundary on every run.
+         */
+        fun startOfDay(referenceUtcMs: Long, dayOffset: Int): Long = Calendar.getInstance().apply {
+            timeInMillis = referenceUtcMs
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)

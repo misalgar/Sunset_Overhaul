@@ -1,0 +1,12 @@
+# Sunset Overhaul — Recent Changes
+
+*(Append brief 3–5 bullet summaries of new changes at the top of this file. Historical milestones §5.1–§5.38 are archived in `docs/IMPLEMENTATION_PLAN.md`.)*
+
+- **Paparazzi visual testing (JVM-only, no emulator).** Added the Paparazzi Gradle plugin to `:core:ui` and `:feature:live`, with the first goldens for the live grid tile (`SunsetLiveChannelTile`: unfocused + focused) and the Live hero (`SunsetHeroPreviewHeader`). Record with `recordPaparazziDebug`, verify with `verifyPaparazziDebug`.
+- **Paparazzi 1.3.4 does not work with AGP 9.** The 1.3.x plugin resolves the removed legacy `TestedExtension` variant API and fails at plugin apply, so the version was pinned to `2.0.0-alpha05.1`, the first release with AGP 9 support.
+- **The build now requires JDK 21.** Paparazzi 2.x declares a JVM 21 runtime on the root buildscript classpath, so every Gradle invocation needs JDK 21 (JDK 17 is no longer enough). `scripts/build-release.ps1` was switched to JDK 21 and now fails fast with a clear message if it is missing.
+- **Device config is TV-accurate.** The snapshots render on a 1920x1080 landscape canvas at xhdpi, i.e. the 960x540 dp TV viewport, with the locale pinned to `en-rUS` (the AOSP qualifier syntax Paparazzi requires) and UTC so goldens are machine-independent.
+- **Paparazzi extended to every feature module.** The plugin is now applied in all 13 `:feature:*` modules, so any of them can host visual tests.
+- **Baseline screen snapshots.** Added `HomeScreenPaparazziTest`, `GuideScreenPaparazziTest`, `MoviesScreenPaparazziTest` and `SearchScreenPaparazziTest`. All artwork URLs are null, so `SunsetArtwork` renders its deterministic gradient + monogram and no snapshot needs the network or a provider.
+- **Movies paging is loaded synchronously in tests.** `LazyPagingItems(Flow)` is internal in Paging 3.5, so the test uses the public `collectAsLazyPagingItems(Dispatchers.Unconfined)` and replaces `Dispatchers.Main` with an unconfined dispatcher; the grid renders posters in the first frame instead of an empty or skeleton state.
+- **The guide's clock is now injectable.** `GuideScreen` read `System.currentTimeMillis()` directly, so its now-marker, top-bar clock and "N min left" label moved every minute and the golden drifted ~0.12% per minute, past the 0.1% tolerance. `GuideScreen` now takes a `nowProvider: () -> Long` (default: the wall clock) and `GuideViewModel.startOfDay` gained a reference-time overload, so the visual test can freeze the clock and the golden is byte-stable.

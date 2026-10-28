@@ -1,0 +1,13 @@
+docs/IMPLEMENTATION_PLAN.md
+docs/PROVIDER_INTEGRATION.md
+docs/RELEASING.md
+docs/RUNNING_ON_DEVICE.md
+docs/Sunset_Overhaul_Requirements_and_Design_Spec.md
+docs/licenses/
+core/designsystem/src/main/res/font/
+core/player/src/main/res/raw/
+app/src/main/res/drawable-nodpi/
+scripts/
+*.apk
+*.jks
+**/src/test/snapshots/

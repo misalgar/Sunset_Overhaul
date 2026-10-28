@@ -1,0 +1,73 @@
+# Sunset Overhaul — PR gate.
+#
+# Three checks in one job:
+#   1. JVM unit tests (no emulator) across every module.
+#   2. Paparazzi visual regression against the committed goldens in src/test/snapshots.
+#   3. Android lint on the app module.
+#
+# The snapshots are recorded with `recordPaparazziDebug` and compared with
+# `verifyPaparazziDebug`; both tasks only exist in the modules that apply the
+# Paparazzi plugin (:core:ui and :feature:live). Gradle matches the bare task
+# names across all projects, so the names below work from the root.
+name: PR Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same branch; a new push makes the old one moot.
+concurrency:
+  group: pr-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-check:
+    name: Tests, snapshots and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Paparazzi 2.x declares a JVM 21 runtime on the root buildscript classpath,
+      # so the whole Gradle build — not just the screenshot tasks — needs JDK 21+.
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Handles the Gradle dependency cache and the build cache.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # compileSdk 37 resolves to the minor-version platform `platforms;android-37.0`,
+      # which the runner image does not ship. AGP would auto-download it, but doing it
+      # explicitly keeps the failure mode obvious instead of surfacing as an AGP error.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK packages
+        run: sdkmanager --install "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"
+
+      - name: Unit tests, Paparazzi snapshots and lint
+        run: ./gradlew testDebugUnitTest verifyPaparazziDebug :app:lintDebug --console=plain --stacktrace
+
+      # Paparazzi writes the pixel diff and the rendered image next to the report so a
+      # failing snapshot can be inspected without re-running the build locally.
+      - name: Upload Paparazzi failure diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paparazzi-failures
+          path: |
+            **/build/paparazzi/failures/
+            **/build/reports/paparazzi/
+          retention-days: 7
+          if-no-files-found: ignore

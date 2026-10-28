@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -130,6 +131,12 @@ fun GuideScreen(
     onDismissCountryPicker: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Source of the current time. The guide draws a "now" marker, a countdown and a clock, so it
+     * is the one screen whose pixels depend on the wall clock; injecting the clock lets a visual
+     * test freeze it. Production keeps the default.
+     */
+    nowProvider: () -> Long = { System.currentTimeMillis() },
 ) {
     val isTv = LocalIsTelevision.current
     val context = LocalContext.current
@@ -141,7 +148,12 @@ fun GuideScreen(
     val dayWidth = slotWidth * SLOT_COUNT.toFloat()
     val minuteWidth = slotWidth / SLOT_MINUTES.toFloat()
 
-    val dayStart = GuideViewModel.startOfDay(state.selectedDay)
+    // The clock is injected so a visual test can freeze it; production reads the wall clock.
+    // rememberUpdatedState keeps the latest provider without restarting the ticker on every
+    // recomposition (the default argument is a fresh lambda each time).
+    val clock = rememberUpdatedState(nowProvider)
+
+    val dayStart = GuideViewModel.startOfDay(clock.value(), state.selectedDay)
     val dayEnd = dayStart + DAY_MS
     val horizontalState = rememberScrollState()
     val todayFocus = remember { FocusRequester() }
@@ -156,11 +168,11 @@ fun GuideScreen(
         else -> tomorrowFocus
     }
 
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableStateOf(clock.value()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(MINUTE_MS)
-            now = System.currentTimeMillis()
+            now = clock.value()
         }
     }
 

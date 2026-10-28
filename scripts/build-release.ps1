@@ -6,7 +6,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$env:JAVA_HOME = "C:\Users\mko_r\AppData\Local\Temp\opencode\sunset-toolchain\jdk\jdk-17.0.20.1+1"
+# Paparazzi 2.x lives on the root buildscript classpath and declares a JVM 21 runtime, so the
+# whole Gradle build (not just the screenshot tasks) now needs JDK 21+. JDK 17 no longer works.
+$env:JAVA_HOME = "C:\Users\mko_r\AppData\Local\Temp\opencode\sunset-toolchain\jdk\jdk-21.0.12.1+1"
+if (-not (Test-Path (Join-Path $env:JAVA_HOME "bin\java.exe"))) {
+    throw "JDK 21 not found at $env:JAVA_HOME. The Paparazzi Gradle plugin requires a JDK 21+ runtime."
+}
 $env:ANDROID_HOME = "C:\Users\mko_r\AppData\Local\Temp\opencode\sunset-toolchain\sdk"
 
 $root = Split-Path -Parent $PSScriptRoot
