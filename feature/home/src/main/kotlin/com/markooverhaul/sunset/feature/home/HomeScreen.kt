@@ -470,7 +470,7 @@ fun HomeScreen(
                                 onClick = { onOpenChannel(channel) },
                                 progress = nowNext?.now?.let { programme ->
                                     val span = (programme.endUtcMs - programme.startUtcMs).coerceAtLeast(1L)
-                                    ((System.currentTimeMillis() - programme.startUtcMs).toFloat() / span)
+                                    ((state.nowUtcMs - programme.startUtcMs).toFloat() / span)
                                         .coerceIn(0f, 1f)
                                 },
                                 width = if (isTv) 240.dp else 220.dp,

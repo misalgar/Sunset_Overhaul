@@ -33,6 +33,7 @@ import com.markooverhaul.sunset.core.model.ContentType
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.SunsetFilterRow
+import com.markooverhaul.sunset.core.ui.components.SunsetFilterRowSkeleton
 import com.markooverhaul.sunset.core.ui.components.LocalDemoMode
 import com.markooverhaul.sunset.core.ui.components.SunsetPosterCard
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
@@ -49,6 +50,7 @@ fun MoviesRoute(
         state = state,
         movies = movies,
         onSelectCategory = viewModel::selectCategory,
+        onRetryCategories = viewModel::loadCategories,
         onOpenDetails = onOpenDetails,
         modifier = modifier,
     )
@@ -60,6 +62,7 @@ fun MoviesScreen(
     movies: androidx.paging.compose.LazyPagingItems<com.markooverhaul.sunset.core.model.Movie>,
     onSelectCategory: (String?) -> Unit,
     onOpenDetails: (ContentType, String) -> Unit,
+    onRetryCategories: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isTv = LocalIsTelevision.current
@@ -87,12 +90,16 @@ fun MoviesScreen(
             )
         }
         item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
-            SunsetFilterRow(
-                categories = state.categories,
-                selectedId = state.selectedCategoryId,
-                onSelect = onSelectCategory,
-                gutter = 0.dp,
-            )
+            if (state.isLoadingCategories && state.categories.isEmpty()) {
+                SunsetFilterRowSkeleton(gutter = 0.dp)
+            } else {
+                SunsetFilterRow(
+                    categories = state.categories,
+                    selectedId = state.selectedCategoryId,
+                    onSelect = onSelectCategory,
+                    gutter = 0.dp,
+                )
+            }
         }
 
         if (state.error != null) {
@@ -101,7 +108,7 @@ fun MoviesScreen(
                     title = stringResource(R.string.error_network_title),
                     body = providerErrorText(state.error),
                     retryLabel = stringResource(R.string.action_retry),
-                    onRetry = { movies.retry() },
+                    onRetry = onRetryCategories,
                 )
             }
         } else if (refresh is LoadState.Loading && movies.itemCount == 0) {

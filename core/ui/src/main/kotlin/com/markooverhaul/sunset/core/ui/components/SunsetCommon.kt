@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.markooverhaul.sunset.core.designsystem.components.CategoryChip
 import com.markooverhaul.sunset.core.designsystem.components.SunsetIconButton
+import com.markooverhaul.sunset.core.designsystem.components.SunsetSkeleton
 import com.markooverhaul.sunset.core.designsystem.tokens.LocalIsTelevision
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetColors
 import com.markooverhaul.sunset.core.designsystem.tokens.SunsetRadius
@@ -74,6 +77,27 @@ fun SunsetFilterRow(
                 selected = selectedId == category.id,
                 onClick = { onSelect(category.id) },
             )
+        }
+    }
+}
+
+/**
+ * Placeholder chips while categories load, so the filter row does not pop in after the grid.
+ */
+@Composable
+fun SunsetFilterRowSkeleton(
+    modifier: Modifier = Modifier,
+    gutter: Dp = 16.dp,
+) {
+    val widths = listOf(56.dp, 88.dp, 104.dp, 72.dp, 96.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = gutter, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        widths.forEach { width ->
+            SunsetSkeleton(modifier = Modifier.width(width).height(32.dp))
         }
     }
 }

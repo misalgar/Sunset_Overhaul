@@ -14,6 +14,7 @@ import com.markooverhaul.sunset.core.model.ProviderError
 import com.markooverhaul.sunset.core.model.Session
 import com.markooverhaul.sunset.core.model.VersionPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -96,6 +97,8 @@ class SettingsViewModel @Inject constructor(
                 _state.update { it.copy(account = account, accountError = null) }
             } catch (error: ProviderError) {
                 _state.update { it.copy(account = null, accountError = error) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 _state.update { it.copy(account = null, accountError = error) }
             }

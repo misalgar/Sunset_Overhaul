@@ -112,6 +112,7 @@ class LiveViewModel @Inject constructor(
     val previewChannel = _previewChannel.asStateFlow()
 
     private var previewDebounceJob: Job? = null
+    private var loadJob: Job? = null
 
     /** Set by the player so the Live screen can put focus back on the watched channel. */
     val lastPlayedChannelId = liveQueue.lastPlayedChannelId
@@ -167,7 +168,9 @@ class LiveViewModel @Inject constructor(
     }
 
     fun load() {
-        viewModelScope.launch {
+        // Retry must not race the previous attempt: a slow older response could overwrite the new one.
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
                 val payload = withContext(ioDispatcher) {

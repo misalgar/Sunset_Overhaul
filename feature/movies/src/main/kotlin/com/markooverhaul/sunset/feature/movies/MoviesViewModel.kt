@@ -13,6 +13,7 @@ import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.Movie
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -78,6 +79,8 @@ class MoviesViewModel @Inject constructor(
             try {
                 val categories = withContext(ioDispatcher) { provider.getMovieCategories() }
                 _state.update { it.copy(categories = categories, isLoadingCategories = false) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 _state.update { it.copy(isLoadingCategories = false, error = error) }
             }

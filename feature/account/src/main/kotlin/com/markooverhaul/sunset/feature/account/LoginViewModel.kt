@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.markooverhaul.sunset.core.data.repository.AuthRepository
 import com.markooverhaul.sunset.core.model.ProviderError
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -92,6 +93,8 @@ class LoginViewModel @Inject constructor(
                     rememberUsername = current.rememberMe,
                 )
                 _state.update { it.copy(isSubmitting = false, signedIn = true) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 _state.update { it.copy(isSubmitting = false, error = error) }
             }
@@ -106,6 +109,8 @@ class LoginViewModel @Inject constructor(
             try {
                 authRepository.startDemoSession()
                 _state.update { it.copy(isSubmitting = false, signedIn = true) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 _state.update { it.copy(isSubmitting = false, error = error) }
             }

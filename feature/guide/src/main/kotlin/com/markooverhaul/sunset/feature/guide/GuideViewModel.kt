@@ -10,6 +10,7 @@ import com.markooverhaul.sunset.core.model.LiveChannel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +53,8 @@ class GuideViewModel @Inject constructor(
     private val _state = MutableStateFlow(GuideUiState())
     val state = _state.asStateFlow()
 
+    private var loadJob: Job? = null
+
     init {
         viewModelScope.launch {
             favouritesRepository.contentIds.collect { ids ->
@@ -82,7 +85,9 @@ class GuideViewModel @Inject constructor(
     }
 
     fun load() {
-        viewModelScope.launch {
+        // Retry must not race the previous attempt: a slow older response could overwrite the new one.
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
                 val (channels, guide) = withContext(ioDispatcher) {

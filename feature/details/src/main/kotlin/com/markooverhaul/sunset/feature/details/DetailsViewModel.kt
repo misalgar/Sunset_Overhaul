@@ -16,6 +16,7 @@ import com.markooverhaul.sunset.core.model.WatchProgress
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -74,6 +75,8 @@ class DetailsViewModel @Inject constructor(
     private val _state = MutableStateFlow(DetailsUiState())
     val state = _state.asStateFlow()
 
+    private var loadJob: Job? = null
+
     init {
         viewModelScope.launch {
             activeId.flatMapLatest { progressRepository.observe(it) }.collect { progress ->
@@ -114,7 +117,9 @@ class DetailsViewModel @Inject constructor(
     }
 
     fun load() {
-        viewModelScope.launch {
+        // Retry must not race the previous attempt: a slow older response could overwrite the new one.
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _state.update {
                 it.copy(isLoading = true, isLoadingDetail = false, error = null, similar = SimilarState.Loading)
             }
@@ -172,21 +177,28 @@ class DetailsViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            val recommended = withContext(ioDispatcher) {
-                runCatching { provider.getMovieRecommendations(movie.id) }
-                    .getOrDefault(emptyList())
-            }
-            val similar = if (recommended.isNotEmpty()) {
-                recommended
-            } else {
-                withContext(ioDispatcher) {
-                    provider.getMovies(page = 1).items
-                        .filter { candidate ->
-                            candidate.id != movie.id &&
-                                candidate.genres.any { it in movie.genres }
-                        }
-                        .take(10)
+            // Enrichment is best-effort: a provider failure here must never escape the scope and
+            // crash the screen. Cancellation still propagates so retries cancel cleanly.
+            val similar = try {
+                val recommended = withContext(ioDispatcher) {
+                    provider.getMovieRecommendations(movie.id)
                 }
+                if (recommended.isNotEmpty()) {
+                    recommended
+                } else {
+                    withContext(ioDispatcher) {
+                        provider.getMovies(page = 1).items
+                            .filter { candidate ->
+                                candidate.id != movie.id &&
+                                    candidate.genres.any { it in movie.genres }
+                            }
+                            .take(10)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                emptyList()
             }
             if (_state.value.movie?.id == movie.id) {
                 val items = similar.map(SimilarItem::MovieItem)
@@ -244,22 +256,29 @@ class DetailsViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val recommended = withContext(ioDispatcher) {
-                runCatching { provider.getSeriesRecommendations(detail.summary.id) }
-                    .getOrDefault(emptyList())
-            }
-            val similar = if (recommended.isNotEmpty()) {
-                recommended
-            } else {
-                val genres = detail.summary.genres
-                withContext(ioDispatcher) {
-                    provider.getSeries(page = 1).items
-                        .filter { candidate ->
-                            candidate.id != detail.summary.id &&
-                                candidate.genres.any { it in genres }
-                        }
-                        .take(10)
+            // Enrichment is best-effort: a provider failure here must never escape the scope and
+            // crash the screen. Cancellation still propagates so retries cancel cleanly.
+            val similar = try {
+                val recommended = withContext(ioDispatcher) {
+                    provider.getSeriesRecommendations(detail.summary.id)
                 }
+                if (recommended.isNotEmpty()) {
+                    recommended
+                } else {
+                    val genres = detail.summary.genres
+                    withContext(ioDispatcher) {
+                        provider.getSeries(page = 1).items
+                            .filter { candidate ->
+                                candidate.id != detail.summary.id &&
+                                    candidate.genres.any { it in genres }
+                            }
+                            .take(10)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                emptyList()
             }
             if (_state.value.series?.summary?.id == detail.summary.id) {
                 val items = similar.map(SimilarItem::SeriesItem)

@@ -8,15 +8,18 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.markooverhaul.sunset.core.common.IoDispatcher
 import com.markooverhaul.sunset.core.data.paging.SeriesPagingSource
+import com.markooverhaul.sunset.core.data.repository.CatalogueChanges
 import com.markooverhaul.sunset.core.model.Category
 import com.markooverhaul.sunset.core.model.ContentProvider
 import com.markooverhaul.sunset.core.model.SeriesSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -26,12 +29,14 @@ import javax.inject.Inject
 data class SeriesUiState(
     val categories: List<Category> = emptyList(),
     val selectedCategoryId: String? = null,
+    val isLoadingCategories: Boolean = true,
     val error: Throwable? = null,
 )
 
 @HiltViewModel
 class SeriesViewModel @Inject constructor(
     private val provider: ContentProvider,
+    catalogueChanges: CatalogueChanges,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -40,8 +45,12 @@ class SeriesViewModel @Inject constructor(
 
     private val categoryFilter = MutableStateFlow<String?>(null)
 
+    /** A new pager after every grouping change, so a preference change shows at once. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val series: Flow<PagingData<SeriesSummary>> = categoryFilter
+    val series: Flow<PagingData<SeriesSummary>> = combine(
+        categoryFilter,
+        catalogueChanges.revisions,
+    ) { categoryId, _ -> categoryId }
         .flatMapLatest { categoryId ->
             Pager(
                 config = PagingConfig(
@@ -56,19 +65,26 @@ class SeriesViewModel @Inject constructor(
         .cachedIn(viewModelScope)
 
     init {
-        viewModelScope.launch {
-            try {
-                val categories = withContext(ioDispatcher) { provider.getSeriesCategories() }
-                _state.update { it.copy(categories = categories) }
-            } catch (error: Throwable) {
-                _state.update { it.copy(error = error) }
-            }
-        }
+        reloadCategories()
     }
 
     fun selectCategory(categoryId: String?) {
         _state.update { it.copy(selectedCategoryId = categoryId) }
         categoryFilter.value = categoryId
+    }
+
+    fun reloadCategories() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingCategories = true, error = null) }
+            try {
+                val categories = withContext(ioDispatcher) { provider.getSeriesCategories() }
+                _state.update { it.copy(categories = categories, isLoadingCategories = false) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                _state.update { it.copy(isLoadingCategories = false, error = error) }
+            }
+        }
     }
 
     private companion object {

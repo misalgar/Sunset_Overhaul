@@ -38,6 +38,7 @@ import com.markooverhaul.sunset.core.model.variantLabel
 import com.markooverhaul.sunset.core.ui.R
 import com.markooverhaul.sunset.core.ui.components.SunsetDemoBanner
 import com.markooverhaul.sunset.core.ui.components.SunsetFilterRow
+import com.markooverhaul.sunset.core.ui.components.SunsetFilterRowSkeleton
 import com.markooverhaul.sunset.core.ui.components.LocalDemoMode
 import com.markooverhaul.sunset.core.ui.components.SunsetPosterCard
 import com.markooverhaul.sunset.core.ui.util.providerErrorText
@@ -54,6 +55,7 @@ fun SeriesRoute(
         state = state,
         series = series,
         onSelectCategory = viewModel::selectCategory,
+        onRetryCategories = viewModel::reloadCategories,
         onOpenDetails = onOpenDetails,
         modifier = modifier,
     )
@@ -65,6 +67,7 @@ fun SeriesScreen(
     series: LazyPagingItems<SeriesSummary>,
     onSelectCategory: (String?) -> Unit,
     onOpenDetails: (ContentType, String) -> Unit,
+    onRetryCategories: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isTv = LocalIsTelevision.current
@@ -92,12 +95,16 @@ fun SeriesScreen(
             )
         }
         item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
-            SunsetFilterRow(
-                categories = state.categories,
-                selectedId = state.selectedCategoryId,
-                onSelect = onSelectCategory,
-                gutter = 0.dp,
-            )
+            if (state.isLoadingCategories && state.categories.isEmpty()) {
+                SunsetFilterRowSkeleton(gutter = 0.dp)
+            } else {
+                SunsetFilterRow(
+                    categories = state.categories,
+                    selectedId = state.selectedCategoryId,
+                    onSelect = onSelectCategory,
+                    gutter = 0.dp,
+                )
+            }
         }
 
         if (state.error != null) {
@@ -106,7 +113,7 @@ fun SeriesScreen(
                     title = stringResource(R.string.error_network_title),
                     body = providerErrorText(state.error),
                     retryLabel = stringResource(R.string.action_retry),
-                    onRetry = { series.retry() },
+                    onRetry = onRetryCategories,
                 )
             }
         } else if (refresh is LoadState.Loading && series.itemCount == 0) {

@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
@@ -56,6 +57,8 @@ data class HomeUiState(
     val continueWatching: List<WatchProgress> = emptyList(),
     val favouriteIds: Set<String> = emptySet(),
     val nowNext: Map<String, ChannelNowNext> = emptyMap(),
+    /** Clock shared with the live rail so progress and now/next stay current between refreshes. */
+    val nowUtcMs: Long = System.currentTimeMillis(),
     val becauseTitle: String? = null,
     val becauseItems: List<HomeRailItem> = emptyList(),
     val error: Throwable? = null,
@@ -80,6 +83,7 @@ class HomeViewModel @Inject constructor(
     private var loadJob: Job? = null
     private var becauseJob: Job? = null
     private var becauseAnchorId: String? = null
+    private var guide: List<EpgProgramme> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -116,6 +120,25 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             catalogueChanges.revisions.drop(1).collect { refresh() }
         }
+        // Keep the live rail honest between catalogue refreshes: recompute now/next and advance
+        // the progress clock every 30 s, matching the Live and Guide tickers.
+        viewModelScope.launch {
+            while (true) {
+                delay(30_000)
+                val now = System.currentTimeMillis()
+                val programmes = guide
+                _state.update {
+                    it.copy(
+                        nowUtcMs = now,
+                        nowNext = if (programmes.isEmpty()) {
+                            it.nowNext
+                        } else {
+                            nowNextOf(it.liveNow, programmes, now)
+                        },
+                    )
+                }
+            }
+        }
         refresh()
     }
 
@@ -127,6 +150,7 @@ class HomeViewModel @Inject constructor(
                     isLoading = true,
                     loadingLive = true,
                     loadingCatalogue = true,
+                    nowUtcMs = System.currentTimeMillis(),
                     error = null,
                 )
             }
@@ -172,8 +196,14 @@ class HomeViewModel @Inject constructor(
                     }
 
                     launch {
-                        val guide = runCatching { guideDeferred.await() }.getOrDefault(emptyList())
-                        _state.update { it.copy(nowNext = nowNextOf(visibleChannels, guide, now)) }
+                        val programmes = runCatching { guideDeferred.await() }.getOrDefault(emptyList())
+                        guide = programmes
+                        _state.update {
+                            it.copy(
+                                nowUtcMs = now,
+                                nowNext = nowNextOf(visibleChannels, programmes, now),
+                            )
+                        }
                     }
                 }
             } catch (cancelled: CancellationException) {
