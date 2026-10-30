@@ -12,6 +12,8 @@ app/build/outputs/apk/debug/app-debug.apk
 
 Package id: `com.markooverhaul.sunset.v2.debug`
 
+The commands below assume Linux/macOS. On Windows use `gradlew.bat` and the `.ps1` scripts.
+
 ## Option A — USB with adb (recommended)
 
 This is best while developing because you can see crash logs.
@@ -35,14 +37,18 @@ This is best while developing because you can see crash logs.
 
 From the repository root:
 
-```powershell
-& "$env:ANDROID_HOME\platform-tools\adb.exe" devices -l
+```bash
+adb devices -l
 ```
 
-If `ANDROID_HOME` is not set, use the portable SDK path:
+If `adb` is not on `PATH`, source the toolchain environment or use the full path:
 
-```powershell
-& "C:\Users\mko_r\AppData\Local\Temp\opencode\sunset-toolchain\sdk\platform-tools\adb.exe" devices -l
+```bash
+source ~/.local/share/sunset-toolchain/env.sh
+adb devices -l
+
+# or
+~/.local/share/sunset-toolchain/sdk/platform-tools/adb devices -l
 ```
 
 Expected:
@@ -60,16 +66,15 @@ R58M1234567    device usb:1-1 product:... model:... device:...
 
 Use the helper script:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-debug.ps1
+```bash
+./scripts/install-debug.sh
 ```
 
 Or run the commands manually:
 
-```powershell
-$adb = "$env:ANDROID_HOME\platform-tools\adb.exe"
-& $adb install -r .\app\build\outputs\apk\debug\app-debug.apk
-& $adb shell monkey -p com.markooverhaul.sunset.v2.debug -c android.intent.category.LAUNCHER 1
+```bash
+adb install -r ./app/build/outputs/apk/debug/app-debug.apk
+adb shell monkey -p com.markooverhaul.sunset.v2.debug -c android.intent.category.LAUNCHER 1
 ```
 
 You can also tap the **Sunset** icon on the phone after installation.
@@ -99,9 +104,9 @@ The debug build starts a synthetic demo session automatically. It does not conta
 
 An older build with a different signature is installed. Uninstall the old app first:
 
-```powershell
-& $adb uninstall com.markooverhaul.sunset.v2.debug
-& $adb install .\app\build\outputs\apk\debug\app-debug.apk
+```bash
+adb uninstall com.markooverhaul.sunset.v2.debug
+adb install ./app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ### `INSTALL_FAILED_USER_RESTRICTED`
@@ -112,20 +117,23 @@ Enable **Install via USB** in Developer options, or confirm the install prompt o
 
 Capture the crash:
 
-```powershell
-& $adb logcat -c
-& $adb shell monkey -p com.markooverhaul.sunset.v2.debug -c android.intent.category.LAUNCHER 1
-& $adb logcat *:E
+```bash
+adb logcat -c
+adb shell monkey -p com.markooverhaul.sunset.v2.debug -c android.intent.category.LAUNCHER 1
+adb logcat '*:E'
 ```
 
 Send the `AndroidRuntime` / `FATAL EXCEPTION` block.
 
-### `adb` is not recognized
+### `adb: command not found`
 
-Use the full path shown above, or add platform-tools to the current PowerShell session:
+Source the toolchain environment, or add platform-tools to the current shell:
 
-```powershell
-$env:PATH += ";$env:ANDROID_HOME\platform-tools"
+```bash
+source ~/.local/share/sunset-toolchain/env.sh
+
+# or
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
 ```
 
 ## After the debug run: a proper signed release
@@ -133,9 +141,9 @@ $env:PATH += ";$env:ANDROID_HOME\platform-tools"
 The debug APK is for testing. For a release APK that can be shared or installed like a normal app:
 
 1. Create a private upload keystore **outside the repository**.
-2. Add the signing config through `~/.gradle/gradle.properties` or environment variables, never by
-   committing the keystore or passwords.
-3. Build `:app:assembleRelease`.
+2. Add `sunset.signing.*` values to the untracked `local.properties`, never by committing the
+   keystore or passwords.
+3. Build `:app:assembleRelease` (or run `scripts/build-release.sh`).
 4. Install and test the signed `app-release.apk` on the same device.
 5. Only then consider R8, baseline profiles and store packaging.
 

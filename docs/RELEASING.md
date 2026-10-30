@@ -8,7 +8,7 @@ through the Fire TV package installer.
 
 | Item | Value |
 | --- | --- |
-| Release keystore | `C:\Users\mko_r\.sunset\sunset-release.jks` |
+| Release keystore | `sunset.signing.storeFile` in untracked `local.properties` (currently `~/.local/share/sunset-toolchain/sunset-release.jks`) |
 | Key alias | `sunset` |
 | Signing properties | untracked `local.properties` (`sunset.signing.*`) |
 | Update manifest URL | `https://raw.githubusercontent.com/misalgar/sunset_overhaul-releases/main/latest.json` |
@@ -26,15 +26,19 @@ with this key; without it, existing installs cannot be updated.
    versionName = "0.2.0"
    ```
 2. Run:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scripts\build-release.ps1 -Notes "What changed"
+   ```bash
+   ./scripts/build-release.sh --notes "What changed"
    ```
    The script:
    - builds `:app:assembleRelease`,
    - verifies the APK signature,
-   - copies it to `build\release-artifacts\sunset-<version>.apk`,
+   - copies it to `build/release-artifacts/sunset-<version>.apk`,
    - computes SHA-256,
    - rewrites `latest.json` in the releases repo checkout.
+
+   By default the script looks for the releases repo at
+   `~/Repositories/sunset_overhaul-releases`; pass `--releases-dir <path>` if it lives elsewhere.
+   On Windows use `scripts/build-release.ps1` with PowerShell.
 
 The APK is **not** committed to git. It is uploaded as a GitHub release asset.
 
@@ -42,10 +46,10 @@ The APK is **not** committed to git. It is uploaded as a GitHub release asset.
 
 1. Open the releases repo on GitHub → **Releases** → **Draft a new release**.
 2. Tag: `v<versionName>` (for example `v0.1.0`).
-3. Upload `build\release-artifacts\sunset-<version>.apk`.
+3. Upload `build/release-artifacts/sunset-<version>.apk`.
 4. Publish the release. The asset URL must match `latest.json`:
    `https://github.com/misalgar/sunset_overhaul-releases/releases/download/v<version>/sunset-<version>.apk`
-5. In the releases repo (GitHub Desktop), commit and push `latest.json`.
+5. In the releases repo, commit and push `latest.json`.
 
 GitHub's raw endpoint caches for a few minutes; allow up to five minutes before an immediate
 re-check sees the new manifest.

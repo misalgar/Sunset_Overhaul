@@ -2,6 +2,11 @@
 
 *(Append brief 3–5 bullet summaries of new changes at the top of this file. Historical milestones §5.1–§5.38 are archived in `docs/IMPLEMENTATION_PLAN.md`.)*
 
+- **Linux development toolchain.** The build now runs on Fedora Linux with Temurin JDK 21 and Android SDK 37.0; `scripts/build-release.sh` and `scripts/install-debug.sh` are the Linux equivalents of the PowerShell helpers.
+- **Guide golden refreshed for Linux.** Accepted the GuideScreen render after the cross-platform text-rasterization difference; all Paparazzi snapshots now verify on Linux.
+- **Linux docs.** `AGENTS.md`, `README.md`, `docs/RELEASING.md` and `docs/RUNNING_ON_DEVICE.md` now use the Linux JDK/SDK paths and POSIX shell commands.
+- **`gradlew` executable bit.** Git now tracks `gradlew` as executable so fresh checkouts can run it directly on Linux/macOS.
+
 - **Paparazzi visual testing (JVM-only, no emulator).** Added the Paparazzi Gradle plugin to `:core:ui` and `:feature:live`, with the first goldens for the live grid tile (`SunsetLiveChannelTile`: unfocused + focused) and the Live hero (`SunsetHeroPreviewHeader`). Record with `recordPaparazziDebug`, verify with `verifyPaparazziDebug`.
 - **Paparazzi 1.3.4 does not work with AGP 9.** The 1.3.x plugin resolves the removed legacy `TestedExtension` variant API and fails at plugin apply, so the version was pinned to `2.0.0-alpha05.1`, the first release with AGP 9 support.
 - **The build now requires JDK 21.** Paparazzi 2.x declares a JVM 21 runtime on the root buildscript classpath, so every Gradle invocation needs JDK 21 (JDK 17 is no longer enough). `scripts/build-release.ps1` was switched to JDK 21 and now fails fast with a clear message if it is missing.

@@ -34,14 +34,14 @@ stream URL is stored in the repository; release builds still bind the fail-close
 | “Because you watched…” Home rail | Complete |
 | Live-channel 403 copy | Complete |
 
-Builds, lint and JVM tests were verified on 2026-10-23; see [Verification](#verification) and
-[docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for exact commands and results. Manual
-phone and TV demo flows still need a device or emulator.
+Builds, lint and JVM tests were verified on 2026-10-29 on Fedora Linux 44; see
+[Verification](#verification) and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for
+exact commands and results. Manual phone and TV demo flows still need a device or emulator.
 
 ## Requirements
 
-- JDK 17
-- Android SDK platform 37, build-tools 36.0.0 and platform-tools
+- JDK 21 (Temurin). Paparazzi 2.x requires a JDK 21 runtime, so JDK 17 no longer works.
+- Android SDK platform 37.0, build-tools 36.0.0 and platform-tools
 - `ANDROID_HOME` or `local.properties` with `sdk.dir=...`
 - Gradle is provided by the wrapper (9.3.1)
 
@@ -50,7 +50,10 @@ phone and TV demo flows still need a device or emulator.
 ./gradlew :app:installDebug   # requires a connected device/emulator
 ```
 
-On Windows use `gradlew.bat`.
+On Windows use `gradlew.bat`; on Linux and macOS use `./gradlew`. The Linux development toolchain
+lives at `~/.local/share/sunset-toolchain` (JDK 21 and the Android SDK), and
+`~/.local/share/sunset-toolchain/env.sh` is sourced from `~/.bashrc` to export `JAVA_HOME`,
+`ANDROID_HOME` and the SDK tools. See [Running on a device](docs/RUNNING_ON_DEVICE.md).
 
 ## Signing in to a live panel (debug)
 
@@ -125,19 +128,20 @@ The debug application id is `com.markooverhaul.sunset.v2.debug`; release is
 
 ## Verification
 
-Verified on 2026-10-23 with JDK 17, Android SDK 37 and Gradle 9.3.1:
+Verified on 2026-10-29 with JDK 21, Android SDK 37.0, build-tools 36.0.0 and Gradle 9.3.1 on
+Fedora Linux 44:
 
 ```bash
-./gradlew :app:assembleDebug    # BUILD SUCCESSFUL
-./gradlew :app:assembleRelease  # BUILD SUCCESSFUL (unsigned)
-./gradlew :app:lintDebug        # BUILD SUCCESSFUL, 0 errors
-./gradlew test                  # BUILD SUCCESSFUL, 10 JVM tests
+./gradlew :app:assembleDebug                        # BUILD SUCCESSFUL
+./gradlew :app:assembleRelease                      # BUILD SUCCESSFUL (signed)
+./gradlew testDebugUnitTest verifyPaparazziDebug    # BUILD SUCCESSFUL, 72 tests
+./gradlew :app:lintDebug                            # BUILD SUCCESSFUL, 0 errors, 19 warnings
 ```
 
 Artifacts:
 
 - `app/build/outputs/apk/debug/app-debug.apk`
-- `app/build/outputs/apk/release/app-release-unsigned.apk`
+- `app/build/outputs/apk/release/app-release.apk`
 
 Manual phone/TV checks are still outstanding because this environment has no emulator or device.
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) §6 for the checklist and exact

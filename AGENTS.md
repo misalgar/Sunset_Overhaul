@@ -6,7 +6,8 @@
   - Kotlin is applied via AGP 9 built-in support: NEVER add `org.jetbrains.kotlin.android` or `kotlinOptions`.
   - Keep `minSdk = 23` (Navigation Compose is pinned to 2.9.8 and DataStore to 1.2.1).
   - The project requires JDK 21 (Temurin), do not attempt to use JDK 17. 
-  - JDK 21 has been provisioned and can be found at "C:\Users\mko_r\AppData\Local\Temp\opencode\sunset-toolchain\jdk\jdk-21.0.12.1+1"
+  - JDK 21 is provisioned at `/home/misalgar/.local/share/sunset-toolchain/jdk-21`; the Android SDK is at `/home/misalgar/.local/share/sunset-toolchain/sdk`.
+  - `~/.local/share/sunset-toolchain/env.sh` exports `JAVA_HOME`, `ANDROID_HOME` and the SDK tools; it is sourced from `~/.bashrc` for new shells.
 
 ## 2. Token-Saving & Documentation Rules (CRITICAL)
 - **Do NOT read or update files in the `docs/` folder** (`IMPLEMENTATION_PLAN.md`, `PROVIDER_INTEGRATION.md`, `RELEASING.md`, `Sunset_Overhaul_Requirements_and_Design_Spec.md`) during normal tasks. This wastes tokens. All active architectural rules are already in this `AGENTS.md` file.
@@ -32,7 +33,7 @@
 - **Cleartext HTTP:** The Xtream panel API is HTTP and live streams redirect to dynamic raw IPs on port 8080. Debug permits cleartext.
 - **Room Catalogue (DB v4):** Movies/Series use `CatalogueVariantIndex` (`titleKey`, `groupKey`, `isDefault = 1`) to group language/quality variants. Resyncs MUST preserve TMDB columns via `withTmdbState`.
 - **Live Status & Event Times:** `channelStatus(...)` sets `startedAtEpochMillis` ONLY from `LiveChannel.scheduledStartUtcMs` (parsed by `LiveEventSchedule` with 10-min grace), NEVER from 24/7 EPG programme start times. 
-- **OTA Updates:** Handled by `UpdateManager`. Release builds sign via untracked `local.properties` and publish to `misalgar/sunset_overhaul-releases` via `scripts/build-release.ps1`.
+- **OTA Updates:** Handled by `UpdateManager`. Release builds sign via untracked `local.properties` and publish to `misalgar/sunset_overhaul-releases` via `scripts/build-release.sh` (Linux) or `scripts/build-release.ps1` (Windows).
 
 ## 5. Android TV / Fire TV D-Pad & Focus Invariants (DO NOT REGRESS)
 1. **`LocalContentEntryFocus` Binding:** Every top-level route in `LargeTopLevel`/`PhoneTopLevel` MUST read `LocalContentEntryFocus.current` and attach `Modifier.focusRequester(entryFocus)` to its primary entry control so pressing `Down` from `MainShell` top nav works deterministically.
