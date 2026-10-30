@@ -104,6 +104,32 @@ class SunsetChannelTilePaparazziTest {
         }
     }
 
+    @Test
+    fun snapshotFocusedLongNameTile() {
+        paparazzi.snapshot {
+            SunsetTheme(isTelevision = true) {
+                val focusRequester = remember { FocusRequester() }
+                // A focused overflowing title runs the marquee; at t=0 the animation sits at its
+                // initial offset, so the golden freezes the full name clipped at the column edge
+                // (no ellipsis) instead of stuttering off the marquee mid-loop.
+                LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                Box(modifier = Modifier.width(TileWidth)) {
+                    SunsetLiveChannelTile(
+                        channel = LongChannel,
+                        nowTitle = null,
+                        isFavourite = false,
+                        favouriteLabel = "Add to favourites",
+                        unfavouriteLabel = "Remove from favourites",
+                        onPlay = {},
+                        onToggleFavourite = {},
+                        liveStatusText = LiveStatusText,
+                        modifier = Modifier.focusRequester(focusRequester),
+                    )
+                }
+            }
+        }
+    }
+
     @Composable
     private fun Tile(channel: LiveChannel) {
         Box(modifier = Modifier.width(TileWidth)) {

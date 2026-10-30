@@ -1,5 +1,20 @@
 # Sunset Overhaul — Agent Instructions (AGENTS.md)
 
+# Agent Instructions & Project Rules
+
+## Safe Shell Operations
+You are permitted to use the terminal for read-only repository exploration and build inspection. You may use the following safe commands without asking for approval:
+* **Directory mapping:** `ls`, `find`, `tree`
+* **File reading:** `cat`, `head`, `tail`
+* **Filtering & sorting:** `grep`, `awk`, `sort`
+* **Build tasks:** `./gradlew` (for compiling or testing Sunset Overhaul)
+
+## Command Formatting Rules
+* Never use destructive or mutating shell commands (e.g., `rm`, `chmod`, `chown`, `mv`) without explicit prior discussion.
+
+## File Access Boundaries
+* Never access file directories outside the scope of the application, if needed ask for permission first and explain the reason behind it.
+
 ## 1. Ground-Truth Project State
 - **Package Name:** `com.markooverhaul.sunset.v2`
 - **Toolchain & SDK:** AGP `9.1.1`, Gradle `9.3.1`, Kotlin `2.4.10`, `compileSdk = 37`, `targetSdk = 37`, `minSdk = 23`.

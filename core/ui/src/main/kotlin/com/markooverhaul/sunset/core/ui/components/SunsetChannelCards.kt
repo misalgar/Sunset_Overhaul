@@ -236,6 +236,7 @@ fun SunsetLiveChannelTile(
     var longPressHandled by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
     var titleOverflows by remember { mutableStateOf(false) }
+    val titleMarqueeActive = focused && titleOverflows
     val shape = RoundedCornerShape(SunsetRadius.Sm)
     val titleStyle = MaterialTheme.typography.bodyLarge.copy(
         fontWeight = FontWeight.SemiBold,
@@ -301,7 +302,7 @@ fun SunsetLiveChannelTile(
                 ) {
                     Text(
                         text = channel.name,
-                        modifier = if (focused && titleOverflows) {
+                        modifier = if (titleMarqueeActive) {
                             Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                         } else {
                             Modifier
@@ -310,7 +311,15 @@ fun SunsetLiveChannelTile(
                         color = SunsetColors.TextPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        onTextLayout = { result -> titleOverflows = result.hasVisualOverflow },
+                        // While the marquee runs, the text is laid out at an unbounded width so
+                        // hasVisualOverflow reports false; latching it keeps the marquee from
+                        // switching itself off mid-loop, which would stutter and never reveal the
+                        // full name. It is refreshed whenever the marquee is not active.
+                        onTextLayout = { result ->
+                            if (!titleMarqueeActive) {
+                                titleOverflows = result.hasVisualOverflow
+                            }
+                        },
                     )
                     Row(
                         modifier = Modifier.padding(top = 2.dp),

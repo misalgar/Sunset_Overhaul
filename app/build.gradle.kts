@@ -35,6 +35,17 @@ val hasReleaseSigning = releaseStoreFile.isNotEmpty() &&
     releaseKeyAlias.isNotEmpty() &&
     releaseKeyPassword.isNotEmpty()
 
+// The debug key is pinned so an OTA or a reinstalled dev build keeps the same signature. Losing
+// the default ~/.android/debug.keystore otherwise makes installed debug builds impossible to update.
+val debugStoreFile = localProperties.getProperty("sunset.debug.storeFile")?.trim().orEmpty()
+val debugStorePassword = localProperties.getProperty("sunset.debug.storePassword")?.trim().orEmpty()
+val debugKeyAlias = localProperties.getProperty("sunset.debug.keyAlias")?.trim().orEmpty()
+val debugKeyPassword = localProperties.getProperty("sunset.debug.keyPassword")?.trim().orEmpty()
+val hasDebugSigning = debugStoreFile.isNotEmpty() &&
+    debugStorePassword.isNotEmpty() &&
+    debugKeyAlias.isNotEmpty() &&
+    debugKeyPassword.isNotEmpty()
+
 abstract class GenerateNetworkSecurityConfig : DefaultTask() {
     @get:Input
     abstract val providerHost: Property<String>
@@ -114,6 +125,14 @@ android {
     }
 
     signingConfigs {
+        if (hasDebugSigning) {
+            getByName("debug") {
+                storeFile = file(debugStoreFile)
+                storePassword = debugStorePassword
+                keyAlias = debugKeyAlias
+                keyPassword = debugKeyPassword
+            }
+        }
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = file(releaseStoreFile)
